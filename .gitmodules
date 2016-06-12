@@ -1,0 +1,3 @@
+[submodule "libsrc/mouros"]
+	path = libsrc/mouros
+	url = https://github.com/mour/mouros.git

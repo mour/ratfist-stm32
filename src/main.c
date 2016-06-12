@@ -35,15 +35,21 @@ static void bsp_test_task_func(void *params)
 
 			os_task_sleep(100);
 		}
+
+
+		char rx_buffer[100];
+		uint32_t num_ch = os_char_buffer_read_buf(&bsp_rx_buffer, rx_buffer, 100);
+
+		os_char_buffer_write_buf(&bsp_tx_buffer, rx_buffer, num_ch);
 	}
 }
 
 
 int main(void)
 {
-	bsp_init();
-
 	os_init();
+
+	bsp_init();
 
 	task_t bsp_test_task;
 

@@ -45,9 +45,19 @@ target_compile_options(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} mouros)
 
-set_target_properties(${PROJECT_NAME} 
-	PROPERTIES LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,-lc -Wl,--gc-sections --specs=nano.specs"
+
+set_property(
+    TARGET ${PROJECT_NAME}
+    PROPERTY LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,-lc -Wl,--gc-sections"
 )
+
+if(NOT USE_FULL_NEWLIB)
+    set_property(
+        TARGET ${PROJECT_NAME}
+        PROPERTY LINK_FLAGS " --specs=nano.specs"
+        APPEND_STRING
+    )
+endif()
 
 
 

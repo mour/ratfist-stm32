@@ -5,23 +5,15 @@
  * Ratfist.
  */
 
+#ifndef BSP_H_
+#define BSP_H_
+
 #include <stdbool.h> // For bool...
 
 #include <mouros/char_buffer.h> // For the char buffers
 
-#ifndef BSP_H_
-#define BSP_H_
+#include "constants.h" // For the TX and RX buffer sizes.
 
-
-#ifndef BSP_RX_BUFFER_SIZE
-/** The size in bytes of the UART RX character buffer. See bsp_rx_buffer. */
-#define BSP_RX_BUFFER_SIZE 1000
-#endif
-
-#ifndef BSP_TX_BUFFER_SIZE
-/** The size in bytes of the UART TX character buffer. See bsp_tx_buffer. */
-#define BSP_TX_BUFFER_SIZE 1000
-#endif
 
 /** The UART RX buffer. Should be manipulated by os_char_buffer_* methods. */
 extern mailbox_t bsp_rx_buffer;

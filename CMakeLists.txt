@@ -25,6 +25,9 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libsrc/mouros")
 add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/main.c"
     "${BSP_SRC_FILE}"
+    "${CMAKE_CURRENT_LIST_DIR}/src/constants.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/events.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/events.c"
 )
 
 

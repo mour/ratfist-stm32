@@ -22,7 +22,7 @@ before_install:
     mkdir build
     mkdir build/install
 
-install:    
+install:
   # Install libopencm3
   - ./libsrc/mouros/build_libopencm3.sh ./build/install
 
@@ -36,7 +36,8 @@ before_script:
 script:
   # Build it
   - cmake --build . --clean-first
-
+  # And the docs
+  - cmake --build . --target ratfist-doc
 
 
 addons:
@@ -45,3 +46,6 @@ addons:
       # arm-none-eabi gcc & newlib
       - gcc-arm-none-eabi
       - libnewlib-arm-none-eabi
+      # Documentation tools
+      - doxygen
+      - graphviz

@@ -21,6 +21,7 @@ before_install:
   - |
     mkdir build
     mkdir build/install
+    mkdir build/install-tests
 
 install:
   # Install libopencm3
@@ -28,16 +29,33 @@ install:
 
 before_script:
   # Generate the makefiles
-  - mkdir build/ratfist
-  - cd build/ratfist
-  - cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake -DCHIP_FAMILY=STM32F0 -DCMAKE_BUILD_TYPE=Debug -DUSE_FULL_NEWLIB=ON ../..
+  - |
+    mkdir build/ratfist-stm32f0
+    mkdir build/ratfist-tests
+  - |
+    cd build/ratfist-stm32f0
+    cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake -DCHIP_FAMILY=STM32F0 -DCMAKE_BUILD_TYPE=Debug -DUSE_FULL_NEWLIB=ON ../..
+    cd ..
+  - |
+    cd build/ratfist-tests
+    cmake -DCMAKE_INSTALL_PREFIX=../install-tests -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=Debug ../../tests
+
 
 
 script:
   # Build it
-  - cmake --build . --clean-first
+  - cmake --build build/ratfist-stm32f0 --clean-first
   # And the docs
-  - cmake --build . --target ratfist-doc
+  - cmake --build build/ratfist-stm32f0 --target ratfist-doc
+  # Build & run tests
+  - |
+    cd build/ratfist-tests
+    cmake --build . --clean-first
+    ctest -V .
+    cd ../..
+  # Generate coverage
+  - cmake --build build/ratfist-tests --target coverage
+
 
 
 addons:
@@ -46,6 +64,8 @@ addons:
       # arm-none-eabi gcc & newlib
       - gcc-arm-none-eabi
       - libnewlib-arm-none-eabi
+      # 32 bit compiler used for compiling tests
+      - gcc-multilib
       # Documentation tools
       - doxygen
       - graphviz

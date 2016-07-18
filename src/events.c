@@ -26,8 +26,6 @@ union small_size_event_data {
 };
 
 
-
-
 static char *event_name_lut[EVENT_NUM_EVENT_TYPES] = {
 	"SET_PLAN",
 	"GET_PLAN",
@@ -53,21 +51,22 @@ static pool_alloc_t spin_plan_data_pool;
 static struct spin_plan_data spin_plan_data_pool_mem[SPIN_PLAN_DATA_EVENT_POOL_SIZE];
 
 
-static int parse_set_plan(char *save_ptr, struct event **ev)
+static struct event *parse_set_plan(char *save_ptr)
 {
 	struct event *ret_ev = ev_create_event(EVENT_SET_PLAN);
 	if (ret_ev == NULL) {
-		return -1;
+		errno = MEM_ALLOC_ERROR;
+		return NULL;
 	}
 
 	struct spin_plan_data *data = ret_ev->data;
 
-	int ret_val = 0;
+	int err = NO_ERROR;
 
 	// Get channel number string.
 	char *token = strtok_r(NULL, ",", &save_ptr);
 	if (token == NULL) {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -80,7 +79,7 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 	    end_ptr == token || *end_ptr != '\0' ||
 	    ch_num > UCHAR_MAX) {
 
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -97,7 +96,7 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 				data->spin_plan_leg_count = i;
 				break;
 			} else {
-				ret_val = -2;
+				err = PACKET_PARSING_ERROR;
 				goto fail;
 			}
 		}
@@ -108,7 +107,7 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 		if (errno != 0 ||
 		    end_ptr == token || *end_ptr != '\0') {
 
-			ret_val = -2;
+			err = PACKET_PARSING_ERROR;
 			goto fail;
 		}
 
@@ -116,7 +115,7 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 		// Get target string.
 		token = strtok_r(NULL, ",", &save_ptr);
 		if (token == NULL) {
-			ret_val = -2;
+			err = PACKET_PARSING_ERROR;
 			goto fail;
 		}
 
@@ -126,7 +125,7 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 		if (errno != 0 ||
 		    end_ptr == token || *end_ptr != '\0') {
 
-			ret_val = -2;
+			err = PACKET_PARSING_ERROR;
 			goto fail;
 		}
 	}
@@ -134,35 +133,35 @@ static int parse_set_plan(char *save_ptr, struct event **ev)
 	// Not at the end of the packet! This means there were too many legs
 	// in the plan.
 	if (strtok_r(NULL, ",", &save_ptr) != NULL) {
-		ret_val = -3;
+		err = MALFORMED_PACKET_ERROR;
 		goto fail;
 	}
 
 
-	*ev = ret_ev;
-	return 0;
+	return ret_ev;
 
 fail:
 	ev_free_event(ret_ev);
-	*ev = NULL;
-	return ret_val;
+	errno = err;
+	return NULL;
 }
 
-static int parse_get_plan(char *save_ptr, struct event **ev)
+static struct event *parse_get_plan(char *save_ptr)
 {
 	struct event *ret_ev = ev_create_event(EVENT_GET_PLAN);
 	if (ret_ev == NULL) {
-		return -1;
+		errno = MEM_ALLOC_ERROR;
+		return NULL;
 	}
 
 	struct spin_plan_channel *data = ret_ev->data;
 
-	int ret_val = 0;
+	int err = NO_ERROR;
 
 	// Get channel number string.
 	char *token = strtok_r(NULL, ",", &save_ptr);
 	if (token == NULL) {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -176,7 +175,7 @@ static int parse_get_plan(char *save_ptr, struct event **ev)
 	    end_ptr == token || *end_ptr != '\0' ||
 	    ch_num > UCHAR_MAX) {
 
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -184,35 +183,35 @@ static int parse_get_plan(char *save_ptr, struct event **ev)
 
 	// Not at the end of the packet!! Invalid packet.
 	if (strtok_r(NULL, ",", &save_ptr) != NULL) {
-		ret_val = -3;
+		err = MALFORMED_PACKET_ERROR;
 		goto fail;
 	}
 
 
-	*ev = ret_ev;
-	return 0;
+	return ret_ev;
 
 fail:
 	ev_free_event(ret_ev);
-	*ev = NULL;
-	return ret_val;
+	errno = err;
+	return NULL;
 }
 
-static int parse_set_spin_state(char *save_ptr, struct event **ev)
+static struct event *parse_set_spin_state(char *save_ptr)
 {
 	struct event *ret_ev = ev_create_event(EVENT_SET_SPIN_STATE);
 	if (ret_ev == NULL) {
-		return -1;
+		errno = MEM_ALLOC_ERROR;
+		return NULL;
 	}
 
 	struct spin_state_set_data *data = ret_ev->data;
 
-	int ret_val = 0;
+	int err = NO_ERROR;
 
 	// Get channel number string.
 	char *token = strtok_r(NULL, ",", &save_ptr);
 	if (token == NULL) {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -226,7 +225,7 @@ static int parse_set_spin_state(char *save_ptr, struct event **ev)
 	    end_ptr == token || *end_ptr != '\0' ||
 	    ch_num > UCHAR_MAX) {
 
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -236,7 +235,7 @@ static int parse_set_spin_state(char *save_ptr, struct event **ev)
 	// Get the state string.
 	token = strtok_r(NULL, ",", &save_ptr);
 	if (token == NULL) {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -247,42 +246,42 @@ static int parse_set_spin_state(char *save_ptr, struct event **ev)
 		data->state = SPIN_STOPPED;
 
 	} else {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
 
 	// Not at the end of the packet!! Invalid packet.
 	if (strtok_r(NULL, ",", &save_ptr) != NULL) {
-		ret_val = -3;
+		err = MALFORMED_PACKET_ERROR;
 		goto fail;
 	}
 
 
-	*ev = ret_ev;
-	return 0;
+	return ret_ev;
 
 fail:
 	ev_free_event(ret_ev);
-	*ev = NULL;
-	return ret_val;
+	errno = err;
+	return NULL;
 }
 
-static int parse_get_spin_state(char *save_ptr, struct event **ev)
+static struct event *parse_get_spin_state(char *save_ptr)
 {
 	struct event *ret_ev = ev_create_event(EVENT_GET_SPIN_STATE);
 	if (ret_ev == NULL) {
-		return -1;
+		errno = MEM_ALLOC_ERROR;
+		return NULL;
 	}
 
 	struct spin_plan_channel *data = ret_ev->data;
 
-	int ret_val = 0;
+	int err = NO_ERROR;
 
 	// Get channel number string.
 	char *token = strtok_r(NULL, ",", &save_ptr);
 	if (token == NULL) {
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -296,7 +295,7 @@ static int parse_get_spin_state(char *save_ptr, struct event **ev)
 	    end_ptr == token || *end_ptr != '\0' ||
 	    ch_num > UCHAR_MAX) {
 
-		ret_val = -2;
+		err = PACKET_PARSING_ERROR;
 		goto fail;
 	}
 
@@ -304,18 +303,17 @@ static int parse_get_spin_state(char *save_ptr, struct event **ev)
 
 	// Not at the end of the packet!! Invalid packet.
 	if (strtok_r(NULL, ",", &save_ptr) != NULL) {
-		ret_val = -3;
+		err = MALFORMED_PACKET_ERROR;
 		goto fail;
 	}
 
 
-	*ev = ret_ev;
-	return 0;
+	return ret_ev;
 
 fail:
 	ev_free_event(ret_ev);
-	*ev = NULL;
-	return ret_val;
+	errno = err;
+	return NULL;
 }
 
 
@@ -329,19 +327,24 @@ static ssize_t serialize_spin_plan_reply(const struct event *ev,
 	ssize_t len = 0;
 
 	len = snprintf(output_buf, (unsigned long) output_buf_len,
-	               "%hhu", data->channel_num);
+	               "%s,%hhu",
+	               event_name_lut[EVENT_SPIN_PLAN_REPLY],
+	               data->channel_num);
+
 	if (len >= output_buf_len) {
+		errno = PACKET_SERIALIZATION_ERROR;
 		return -1;
 	}
 
 	for (uint32_t i = 0; i < data->spin_plan_leg_count; i++) {
-		len += snprintf(output_buf,
+		len += snprintf(&output_buf[len],
 				(unsigned long) (output_buf_len - len),
 		                ",%lu,%f",
 		                data->plan_legs[i].duration_msecs,
 		                data->plan_legs[i].target_pct);
 
 		if (len >= output_buf_len) {
+			errno = PACKET_SERIALIZATION_ERROR;
 			return -1;
 		}
 	}
@@ -358,13 +361,15 @@ static ssize_t serialize_spin_state_reply(const struct event *ev,
 	ssize_t len = 0;
 
 	len = snprintf(output_buf, (unsigned long) output_buf_len,
-	               "%hhu,%s,%llu,%f",
+	               "%s,%hhu,%s,%llu,%f",
+	               event_name_lut[EVENT_SPIN_STATE_REPLY],
 	               data->channel_num,
 	               spin_state_lut[data->state],
 	               data->plan_time_elapsed_msecs,
 	               data->output_val_pct);
 
 	if (len >= output_buf_len) {
+		errno = PACKET_SERIALIZATION_ERROR;
 		return -1;
 	}
 
@@ -392,44 +397,38 @@ void ev_init(void)
 }
 
 
-int ev_parse_event(char *input_buf, struct event **event_ptr)
+struct event *ev_parse_event(char *input_buf)
 {
 	char *save_ptr = NULL;
 	char *token = strtok_r(input_buf, ",", &save_ptr);
 
 	struct event *ret_event = NULL;
 
-	int parse_retval = 0;
-
 	if (strcmp(token, event_name_lut[EVENT_SET_PLAN]) == 0) {
-		parse_retval = parse_set_plan(save_ptr, &ret_event);
+		ret_event = parse_set_plan(save_ptr);
 
 	} else if (strcmp(token, event_name_lut[EVENT_GET_PLAN]) == 0) {
-		parse_retval = parse_get_plan(save_ptr, &ret_event);
+		ret_event = parse_get_plan(save_ptr);
 
 	} else if (strcmp(token, event_name_lut[EVENT_SET_SPIN_STATE]) == 0) {
-		parse_retval = parse_set_spin_state(save_ptr, &ret_event);
+		ret_event = parse_set_spin_state(save_ptr);
 
 	} else if (strcmp(token, event_name_lut[EVENT_GET_SPIN_STATE]) == 0) {
-		parse_retval = parse_get_spin_state(save_ptr, &ret_event);
+		ret_event = parse_get_spin_state(save_ptr);
 
 	} else {
 		// All other events are outbound. I.e. should not have to know
 		// how to serialize them.
-		cm3_assert_failed();
+		errno = UNKNOWN_PACKET_ERROR;
+		ret_event = NULL;
 	}
 
-	if (parse_retval != 0) {
-		cm3_assert_failed();
-	} else {
-		*event_ptr = ret_event;
-		return 0;
-	}
+	return ret_event;
 }
 
 ssize_t ev_serialize_event(const struct event *event,
-                        char *output_buf,
-                        ssize_t output_buf_len)
+                           char *output_buf,
+                           ssize_t output_buf_len)
 {
 
 	switch (event->type) {
@@ -445,7 +444,8 @@ ssize_t ev_serialize_event(const struct event *event,
 		cm3_assert_failed();
 	}
 
-	return 0;
+	errno = UNKNOWN_PACKET_ERROR;
+	return -1;
 }
 
 struct event *ev_create_event(enum event_type type)

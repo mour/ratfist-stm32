@@ -12,6 +12,13 @@
 
 #include "constants.h" // For MAX_SPIN_PLAN_LEGS, ...
 
+#define NO_ERROR (0)
+#define MEM_ALLOC_ERROR (-1)
+#define PACKET_PARSING_ERROR (-2)
+#define MALFORMED_PACKET_ERROR (-3)
+#define PACKET_SERIALIZATION_ERROR (-4)
+#define UNKNOWN_PACKET_ERROR (-5)
+
 enum event_type {
 	EVENT_SET_PLAN = 0,
 	EVENT_GET_PLAN,
@@ -77,7 +84,7 @@ struct event {
 
 void ev_init(void);
 
-int ev_parse_event(char *input_buf, struct event **event_ptr);
+struct event *ev_parse_event(char *input_buf);
 ssize_t ev_serialize_event(const struct event *event,
                            char *output_buf,
                            ssize_t output_buf_len);

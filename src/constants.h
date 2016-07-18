@@ -1,7 +1,7 @@
 /**
  * @file
  *
- * TODO Add file description.
+ * This file contains compile time settings for the ratfist-stm32 project.
  */
 
 #ifndef CONSTANTS_H_
@@ -26,34 +26,34 @@
 
 
 
-#ifndef EVENT_STRUCT_POOL_SIZE
+#ifndef MSG_STRUCT_POOL_SIZE
 /**
- * The number of event structs that may be allocated (i.e. waiting to be
+ * The number of message structs that may be allocated (i.e. waiting to be
  * processed) at any given time.
  */
-#define EVENT_STRUCT_POOL_SIZE 35
+#define MSG_STRUCT_POOL_SIZE 35
 #endif
 
-#ifndef SMALL_SIZED_EVENT_POOL_SIZE
+#ifndef SMALL_SIZED_MSG_POOL_SIZE
 /**
- * The number of event data structs that may be allocated (i.e. waiting to be
- * processed) at any given time, for the following types of events:
+ * The number of message data structs that may be allocated (i.e. waiting to be
+ * processed) at any given time, for the following types of messages:
  *  - GET_PLAN
  *  - SET_SPIN_STATE
  *  - GET_SPIN_STATE
  *  - SPIN_STATE_REPLY
  */
-#define SMALL_SIZED_EVENT_POOL_SIZE 30
+#define SMALL_SIZED_MSG_POOL_SIZE 30
 #endif
 
-#ifndef SPIN_PLAN_DATA_EVENT_POOL_SIZE
+#ifndef SPIN_PLAN_DATA_MSG_POOL_SIZE
 /**
- * The number of event data structs that may be allocated (i.e. waiting to be
- * processed) at any given time, for the following types of events:
+ * The number of message data structs that may be allocated (i.e. waiting to be
+ * processed) at any given time, for the following types of messages:
  *  - SET_PLAN
  *  - SPIN_PLAN_REPLY
  */
-#define SPIN_PLAN_DATA_EVENT_POOL_SIZE 5
+#define SPIN_PLAN_DATA_MSG_POOL_SIZE 5
 #endif
 
 

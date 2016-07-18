@@ -1,11 +1,12 @@
 /**
  * @file
  *
- * TODO Add file description.
+ * This file contains the struct and function declarations for the ratfist
+ * message factory.
  */
 
-#ifndef EVENTS_H_
-#define EVENTS_H_
+#ifndef MESSAGES_H_
+#define MESSAGES_H_
 
 #include <stdint.h> // For uint32_t
 #include <sys/types.h> // For ssize_t
@@ -14,19 +15,19 @@
 
 #define NO_ERROR (0)
 #define MEM_ALLOC_ERROR (-1)
-#define PACKET_PARSING_ERROR (-2)
-#define MALFORMED_PACKET_ERROR (-3)
-#define PACKET_SERIALIZATION_ERROR (-4)
-#define UNKNOWN_PACKET_ERROR (-5)
+#define MESSAGE_PARSING_ERROR (-2)
+#define MALFORMED_MESSAGE_ERROR (-3)
+#define MESSAGE_SERIALIZATION_ERROR (-4)
+#define UNKNOWN_MESSAGE_TYPE_ERROR (-5)
 
-enum event_type {
-	EVENT_SET_PLAN = 0,
-	EVENT_GET_PLAN,
-	EVENT_SPIN_PLAN_REPLY,
-	EVENT_SET_SPIN_STATE,
-	EVENT_GET_SPIN_STATE,
-	EVENT_SPIN_STATE_REPLY,
-	EVENT_NUM_EVENT_TYPES
+enum message_type {
+	MSG_SET_PLAN = 0,
+	MSG_GET_PLAN,
+	MSG_SPIN_PLAN_REPLY,
+	MSG_SET_SPIN_STATE,
+	MSG_GET_SPIN_STATE,
+	MSG_SPIN_STATE_REPLY,
+	MSG_NUM_MESSAGE_TYPES
 };
 
 /**
@@ -77,21 +78,21 @@ struct spin_state_data {
 
 
 
-struct event {
-	enum event_type type;
+struct message {
+	enum message_type type;
 	void *data;
 };
 
-void ev_init(void);
+void msg_init(void);
 
-struct event *ev_parse_event(char *input_buf);
-ssize_t ev_serialize_event(const struct event *event,
-                           char *output_buf,
-                           ssize_t output_buf_len);
+struct message *msg_parse_message(char *input_buf);
+ssize_t msg_serialize_message(const struct message *msg,
+                              char *output_buf,
+                              ssize_t output_buf_len);
 
-struct event *ev_create_event(enum event_type type);
-void ev_free_event(struct event *event);
+struct message *msg_create_message(enum message_type type);
+void msg_free_message(struct message *msg);
 
-#endif /* EVENTS_H_ */
+#endif /* MESSAGES_H_ */
 
 

@@ -67,6 +67,7 @@ set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/../src/messages.c" PROPER
 add_test(NAME messages COMMAND test_messages)
 set_tests_properties(messages PROPERTIES DEPENDS test_messages)
 
+add_dependencies(test_messages cmocka)
 
 
 # Covearge

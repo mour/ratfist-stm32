@@ -39,6 +39,7 @@ before_script:
   - |
     cd build/ratfist-tests
     cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=Debug ../../tests
+    cd ../..
 
 
 
@@ -47,12 +48,13 @@ script:
   - cmake --build build/ratfist-stm32f0 --clean-first
   # And the docs
   - cmake --build build/ratfist-stm32f0 --target ratfist-doc
+  # Install them so that the tests can find them
+  - cmake --build build/ratfist-stm32f0 --target install
   # Build & run tests
-  - |
-    cd build/ratfist-tests
-    cmake --build . --clean-first
-    ctest -V .
-    cd ../..
+  - cd build/ratfist-tests
+  - cmake --build . --clean-first
+  - ctest -V .
+  - cd ../..
   # Generate coverage
   - cmake --build build/ratfist-tests --target coverage
 

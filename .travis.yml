@@ -21,7 +21,7 @@ before_install:
   - |
     mkdir build
     mkdir build/install
-    mkdir build/install-tests
+
 
 install:
   # Install libopencm3
@@ -35,10 +35,10 @@ before_script:
   - |
     cd build/ratfist-stm32f0
     cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake -DCHIP_FAMILY=STM32F0 -DCMAKE_BUILD_TYPE=Debug -DUSE_FULL_NEWLIB=ON ../..
-    cd ..
+    cd ../..
   - |
     cd build/ratfist-tests
-    cmake -DCMAKE_INSTALL_PREFIX=../install-tests -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=Debug ../../tests
+    cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=Debug ../../tests
 
 
 

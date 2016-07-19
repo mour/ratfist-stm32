@@ -17,6 +17,9 @@ before_install:
   # Pystache needed for generation of MourOS diagnostic code
   - sudo pip install pystache
 
+  # Needed for generation of coverage reports
+  - sudo pip install gcovr
+
   # Create the build directories
   - |
     mkdir build

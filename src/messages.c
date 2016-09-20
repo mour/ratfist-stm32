@@ -16,7 +16,7 @@
 #include <mouros/pool_alloc.h> // For the pool_allocator.
 
 #include "messages.h" // Function & struct declarations.
-
+#include "errors.h" // For ratfist error codes.
 
 
 union small_size_msg_data {
@@ -331,20 +331,29 @@ static ssize_t serialize_spin_plan_reply(const struct message *msg,
 	               msg_name_lut[MSG_SPIN_PLAN_REPLY],
 	               data->channel_num);
 
-	if (len >= output_buf_len) {
-		errno = MESSAGE_SERIALIZATION_ERROR;
+	if (len <= 0) {
+		errno = MESSAGE_FORMATTING_ERROR;
+		return -1;
+	} else if (len >= output_buf_len) {
+		errno = MESSAGE_BUF_TOO_SMALL_ERROR;
 		return -1;
 	}
 
 	for (uint32_t i = 0; i < data->spin_plan_leg_count; i++) {
-		len += snprintf(&output_buf[len],
-				(unsigned long) (output_buf_len - len),
-		                ",%lu,%f",
-		                data->plan_legs[i].duration_msecs,
-		                data->plan_legs[i].target_pct);
+		ssize_t curr_len = snprintf(&output_buf[len],
+				            (size_t) (output_buf_len - len),
+		                            ",%lu,%f",
+		                            data->plan_legs[i].duration_msecs,
+		                            data->plan_legs[i].target_pct);
 
+		if (curr_len <= 0) {
+			errno = MESSAGE_FORMATTING_ERROR;
+			return -1;
+		}
+
+		len += curr_len;
 		if (len >= output_buf_len) {
-			errno = MESSAGE_SERIALIZATION_ERROR;
+			errno = MESSAGE_BUF_TOO_SMALL_ERROR;
 			return -1;
 		}
 	}
@@ -358,18 +367,20 @@ static ssize_t serialize_spin_state_reply(const struct message *msg,
 {
 	struct spin_state_data *data = msg->data;
 
-	ssize_t len = 0;
+	ssize_t len = snprintf(output_buf, (size_t) output_buf_len,
+	                       "%s,%hhu,%s,%llu,%f",
+	                       msg_name_lut[MSG_SPIN_STATE_REPLY],
+	                       data->channel_num,
+	                       spin_state_lut[data->state],
+	                       data->plan_time_elapsed_msecs,
+	                       data->output_val_pct);
 
-	len = snprintf(output_buf, (unsigned long) output_buf_len,
-	               "%s,%hhu,%s,%llu,%f",
-	               msg_name_lut[MSG_SPIN_STATE_REPLY],
-	               data->channel_num,
-	               spin_state_lut[data->state],
-	               data->plan_time_elapsed_msecs,
-	               data->output_val_pct);
+	if (len <= 0) {
+		errno = MESSAGE_FORMATTING_ERROR;
+		return -1;
 
-	if (len >= output_buf_len) {
-		errno = MESSAGE_SERIALIZATION_ERROR;
+	} else if (len >= output_buf_len) {
+		errno = MESSAGE_BUF_TOO_SMALL_ERROR;
 		return -1;
 	}
 

@@ -13,13 +13,6 @@
 
 #include "constants.h" // For MAX_SPIN_PLAN_LEGS, ...
 
-#define NO_ERROR (0)
-#define MEM_ALLOC_ERROR (-1)
-#define MESSAGE_PARSING_ERROR (-2)
-#define MALFORMED_MESSAGE_ERROR (-3)
-#define MESSAGE_SERIALIZATION_ERROR (-4)
-#define UNKNOWN_MESSAGE_TYPE_ERROR (-5)
-
 enum message_type {
 	MSG_SET_PLAN = 0,
 	MSG_GET_PLAN,

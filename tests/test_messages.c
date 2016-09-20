@@ -18,6 +18,7 @@
 #include <stdlib.h>
 
 #include "../src/messages.h"
+#include "../src/errors.h"
 
 static bool float_equals(float lhs, float rhs) {
 	return fabsf(lhs - rhs) < FLT_EPSILON;
@@ -666,11 +667,11 @@ static void serialize_spin_plan_reply_test(void **state)
 	// Check buffer to short situations
 	errno = 0;
 	assert_int_equal(msg_serialize_message(&test_msg, test_buf, 4), -1);
-	assert_int_equal(errno, MESSAGE_SERIALIZATION_ERROR);
+	assert_int_equal(errno, MESSAGE_BUF_TOO_SMALL_ERROR);
 
 	errno = 0;
 	assert_int_equal(msg_serialize_message(&test_msg, test_buf, 40), -1);
-	assert_int_equal(errno, MESSAGE_SERIALIZATION_ERROR);
+	assert_int_equal(errno, MESSAGE_BUF_TOO_SMALL_ERROR);
 }
 
 static void serialize_spin_state_reply_test(void **state)
@@ -728,7 +729,7 @@ static void serialize_spin_state_reply_test(void **state)
 	// Check buffer to short situations
 	errno = 0;
 	assert_int_equal(msg_serialize_message(&test_msg, test_buf, 4), -1);
-	assert_int_equal(errno, MESSAGE_SERIALIZATION_ERROR);
+	assert_int_equal(errno, MESSAGE_BUF_TOO_SMALL_ERROR);
 }
 
 static void unknown_messages_test(void **state)

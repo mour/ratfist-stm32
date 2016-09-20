@@ -29,6 +29,10 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/constants.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/messages.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/messages.c"
+    "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.c"
+    "${CMAKE_CURRENT_LIST_DIR}/src/worker.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
 )
 
 

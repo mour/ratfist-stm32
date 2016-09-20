@@ -6,6 +6,8 @@
 
 #include "bsp.h"
 
+#include "message_dispatcher.h"
+
 static void bsp_test_task_func(void *params)
 {
 	(void) params;
@@ -50,6 +52,8 @@ int main(void)
 	os_init();
 
 	bsp_init();
+
+	dispatcher_init();
 
 	task_t bsp_test_task;
 

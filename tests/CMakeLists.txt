@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(mouros-tests VERSION 0.0.1 LANGUAGES C)
+project(ratfist-tests VERSION 0.0.1 LANGUAGES C)
 
 
 
@@ -28,6 +28,7 @@ link_libraries("--coverage")
 # Add include stub overrides
 include_directories(
     "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/tests/stubs/include"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/include"
 )
 
 # Add public include dirs
@@ -68,6 +69,28 @@ add_test(NAME messages COMMAND test_messages)
 set_tests_properties(messages PROPERTIES DEPENDS test_messages)
 
 add_dependencies(test_messages cmocka)
+
+
+
+# Message dispatcher tests
+add_executable(test_dispatcher
+    "${CMAKE_CURRENT_LIST_DIR}/../src/message_dispatcher.h"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/message_dispatcher.c"
+    "${CMAKE_CURRENT_LIST_DIR}/test_dispatcher.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/pool_alloc.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/mailbox.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/char_buffer.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/tests/stubs/mouros/tasks.c"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/messages.c"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/worker.c"
+)
+
+set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/../src/message_dispatcher.c" PROPERTIES COMPILE_FLAGS "--coverage")
+
+add_test(NAME dispatcher COMMAND test_dispatcher)
+set_tests_properties(dispatcher PROPERTIES DEPENDS test_dispatcher)
+
+add_dependencies(test_dispatcher cmocka)
 
 
 # Covearge

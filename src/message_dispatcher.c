@@ -112,7 +112,7 @@ static void assemble_incoming_message(void *params)
 			*msg_is_incoming = false;
 		}
 	} else {
-		os_task_yield();
+		os_task_sleep(COMM_TASK_SLEEP_TIME_TICKS);
 	}
 }
 
@@ -149,7 +149,7 @@ static void check_outgoing_queue(void *params)
 					 BSP_MAX_MESSAGE_LENGTH,
 					 tx_char_buffer);
 	} else {
-		os_task_yield();
+		os_task_sleep(COMM_TASK_SLEEP_TIME_TICKS);
 	}
 }
 

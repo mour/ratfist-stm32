@@ -125,8 +125,8 @@ static void send_msg_test(void **state)
 
 	assert_string_equal("$SERIALIZED_MESSAGE*06\r\n", buf);
 
-
 	// The next iteration should not do anything.
+	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
 	init_data[1].action(init_data[1].action_params);
 	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
 
@@ -193,7 +193,6 @@ static void send_msg_test(void **state)
 
 	// Do an iteration. This should send the error message from the last
 	// iteration.
-	init_data[1].action(init_data[1].action_params);
 	init_data[1].action(init_data[1].action_params);
 
 	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
@@ -288,6 +287,8 @@ static void recv_msg_test(void **state)
 	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
 	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
 
+	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
+
 	init_data[0].action(init_data[0].action_params);
 
 	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
@@ -329,6 +330,8 @@ static void recv_msg_test(void **state)
 	}
 
 	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
+
+	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
 
 	// Do an iteration of the sender thread and make sure no message was
 	// output.

@@ -1,0 +1,21 @@
+[package]
+name = "ratfist-stm32"
+version = "0.1.0"
+authors = ["Ondrej Palenicek <ondrej.palenicek@gmail.com>"]
+
+[lib]
+name = "ratfist"
+crate-type = ["staticlib"]
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+
+[dependencies]
+
+[dependencies.mouros-rust-bindings]
+path = "../libsrc/mouros/rust"

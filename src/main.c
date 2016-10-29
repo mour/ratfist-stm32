@@ -3,49 +3,19 @@
 #include <stdbool.h>
 
 #include <mouros/tasks.h>
+#include "worker.h"
 
 #include "bsp.h"
 
 #include "message_dispatcher.h"
 
-static void bsp_test_task_func(void *params)
-{
-	(void) params;
-
-	while (true) {
-		bsp_led_on(LED1);
-		bsp_led_on(LED2);
-		bsp_led_on(LED3);
-		bsp_led_on(LED4);
+#include <stdio.h>
 
 
-		os_task_sleep(1000);
-
-		bsp_led_off(LED1);
-		bsp_led_off(LED2);
-		bsp_led_off(LED3);
-		bsp_led_off(LED4);
-
-		os_task_sleep(1000);
+#include "rust-bindings/spinner.h"
 
 
-		for (uint8_t i = 0; i < 10; i++) {
-			bsp_led_toggle(LED1);
-			bsp_led_toggle(LED2);
-			bsp_led_toggle(LED3);
-			bsp_led_toggle(LED4);
-
-			os_task_sleep(100);
-		}
-
-
-		char rx_buffer[100];
-		uint32_t num_ch = os_char_buffer_read_buf(&bsp_rx_buffer, rx_buffer, 100);
-
-		os_char_buffer_write_buf(&bsp_tx_buffer, rx_buffer, num_ch);
-	}
-}
-
+uint8_t rust_worker_stack[2000];
 
 int main(void)
 {
@@ -55,12 +25,9 @@ int main(void)
 
 	dispatcher_init();
 
-	task_t bsp_test_task;
-
-	os_task_init_with_stack(&bsp_test_task, "bsp_test_task", 2000, 0,
-	                        bsp_test_task_func, NULL);
-
-	os_task_add(&bsp_test_task);
+	worker_t rust_worker;
+	worker_task_init(&rust_worker, "rust_worker", rust_worker_stack, 2000, 10, spinner_main_loop, NULL);
+	worker_start(&rust_worker);
 
 	os_tasks_start(1000);
 

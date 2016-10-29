@@ -5,24 +5,34 @@ project(ratfist VERSION 0.0.1 LANGUAGES C)
 
 find_package(Doxygen)
 
-if(NOT DEFINED CHIP_FAMILY)
-    message(FATAL_ERROR "A STM32 chip family must be defined. -DCHIP_FAMILY=...\nAllowed families are: STM32F0")
+if(NOT DEFINED BOARD_TYPE)
+    message(FATAL_ERROR "A STM32 board type must be defined. -DBOARD_TYPE=...\nAllowed board types are: stm32f072discovery")
 endif()
 
 
-if(CHIP_FAMILY STREQUAL "STM32F0")
+if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f0discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")
     set(BSP_SRC_FILE "${CMAKE_CURRENT_LIST_DIR}/src/stm32f072-discovery/bsp.c")
+    set(XARGO_TARGET "thumbv6m-none-eabi")
 else()
-    message(FATAL_ERROR "Unknown CHIP_FAMILY: ${CHIP_FAMILY}\nAllowed families are: STM32F0")
+    message(FATAL_ERROR "Unknown BOARD_TYPE: ${BOARD_TYPE}\nAllowed board types are: stm32f072discovery")
 endif()
 
 
-
+# MourOS
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libsrc/mouros")
 
 
+# Rust part of ratfist
+add_custom_target(rust-lib "xargo" "build" "--lib" "--target" "${XARGO_TARGET}" "$<$<CONFIG:Release>:--release>"
+                  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
+
+add_custom_target(rust-clean "xargo" "clean"
+                  WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
+
+
+# Ratfist binary
 add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/main.c"
     "${BSP_SRC_FILE}"
@@ -34,6 +44,8 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
 )
+
+add_dependencies(${PROJECT_NAME} rust-lib)
 
 
 target_compile_options(${PROJECT_NAME}
@@ -52,6 +64,7 @@ target_compile_options(${PROJECT_NAME}
             "$<$<CONFIG:Debug>:-g3>")
 
 target_link_libraries(${PROJECT_NAME} mouros)
+target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${XARGO_TARGET}/$<LOWER_CASE:${CMAKE_BUILD_TYPE}>/libratfist.a")
 
 
 set_property(

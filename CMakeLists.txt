@@ -73,9 +73,13 @@ set_property(
 )
 
 if(NOT USE_FULL_NEWLIB)
+    # Also pull in floating point support for *printf functions.
+    # However, during linking this causes _sbrk_r to be pulled in from newlib
+    # nano, instead of the _sbrk_r implementation from libmouros. To get around 
+    # this, newlib nano must be compiled with -DREENTRANT_SYSCALLS_PROVIDED.
     set_property(
         TARGET ${PROJECT_NAME}
-        PROPERTY LINK_FLAGS " --specs=nano.specs"
+        PROPERTY LINK_FLAGS " --specs=nano.specs -Wl,--require-defined=_printf_float"
         APPEND_STRING
     )
 endif()

@@ -63,6 +63,7 @@ target_compile_options(${PROJECT_NAME}
             "-Wfloat-equal"
             "$<$<CONFIG:Debug>:-g3>")
 
+target_link_libraries(${PROJECT_NAME} m)
 target_link_libraries(${PROJECT_NAME} mouros)
 target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${XARGO_TARGET}/$<LOWER_CASE:${CMAKE_BUILD_TYPE}>/libratfist.a")
 

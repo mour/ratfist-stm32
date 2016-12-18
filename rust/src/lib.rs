@@ -1,15 +1,18 @@
 #![feature(lang_items)]
 #![no_std]
 
-mod bindings;
-
 #[macro_use]
 mod machine;
+mod bindings;
 
 pub mod spinner;
-pub use spinner::*;
+
+#[macro_use]
+extern crate mouros_rust_bindings;
+
 
 #[lang = "panic_fmt"]
-extern fn panic_fmt() -> ! {
-    loop {}
+extern "C" fn panic_fmt() -> ! {
+    loop {
+    }
 }

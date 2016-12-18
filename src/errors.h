@@ -24,6 +24,8 @@
 
 #define INCOMING_MESSAGE_TOO_LONG_ERROR (-11)
 
+#define MESSAGE_QUEUE_FULL_ERROR (-12)
+
 #endif /* ERRORS_H_ */
 
 

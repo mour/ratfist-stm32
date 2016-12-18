@@ -20,6 +20,7 @@
 #include "constants.h"
 #include "errors.h"
 
+#include "rust-bindings/spinner.h" // For the spinner mailbox pointer.
 
 /**
  * Outgoing error message (error code) queue.
@@ -195,7 +196,10 @@ static void process_incoming_message(char *message_buf, uint32_t len)
 	case MSG_GET_PLAN:
 	case MSG_SET_SPIN_STATE:
 	case MSG_GET_SPIN_STATE:
-		// TODO send to the spinner subsystem
+		if (!os_mailbox_write(SPINNER_MSG_QUEUE_PTR, &msg)) {
+			dispatcher_send_err(MESSAGE_QUEUE_FULL_ERROR);
+			msg_free_message(msg);
+		}
 		break;
 	default:
 		dispatcher_send_err(MESSAGE_ROUTING_ERROR);

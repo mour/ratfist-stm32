@@ -1,6 +1,7 @@
-// mod message_dispatcher;
-// mod worker;
+extern crate mouros_rust_bindings;
+
 pub mod bsp;
-// mod errors;
-// mod messages;
-// mod constants;
+pub mod errors;
+pub mod messages;
+pub mod message_dispatcher;
+pub mod constants;

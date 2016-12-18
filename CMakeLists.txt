@@ -6,7 +6,7 @@ project(ratfist VERSION 0.0.1 LANGUAGES C)
 find_package(Doxygen)
 
 if(NOT DEFINED BOARD_TYPE)
-    message(FATAL_ERROR "A STM32 board type must be defined. -DBOARD_TYPE=...\nAllowed board types are: stm32f072discovery")
+    message(FATAL_ERROR "A STM32 board type must be defined. -DBOARD_TYPE=...\nAllowed board types are: stm32f072discovery, stm32f411discovery")
 endif()
 
 
@@ -15,8 +15,13 @@ if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")
     set(BSP_SRC_FILE "${CMAKE_CURRENT_LIST_DIR}/src/stm32f072-discovery/bsp.c")
     set(XARGO_TARGET "thumbv6m-none-eabi")
+elseif(BOARD_TYPE STREQUAL "stm32f411discovery")
+    set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f4discovery.cfg")
+    set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")
+    set(BSP_SRC_FILE "${CMAKE_CURRENT_LIST_DIR}/src/stm32f411-discovery/bsp.c")
+    set(XARGO_TARGET "thumbv7em-none-eabihf")
 else()
-    message(FATAL_ERROR "Unknown BOARD_TYPE: ${BOARD_TYPE}\nAllowed board types are: stm32f072discovery")
+    message(FATAL_ERROR "Unknown BOARD_TYPE: ${BOARD_TYPE}\nAllowed board types are: stm32f072discovery, stm32f411discovery")
 endif()
 
 
@@ -43,6 +48,7 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
+    "${CMAKE_CURRENT_LIST_DIR}/src/rust-bindings/spinner.h"
 )
 
 add_dependencies(${PROJECT_NAME} rust-lib)
@@ -76,7 +82,7 @@ set_property(
 if(NOT USE_FULL_NEWLIB)
     # Also pull in floating point support for *printf functions.
     # However, during linking this causes _sbrk_r to be pulled in from newlib
-    # nano, instead of the _sbrk_r implementation from libmouros. To get around 
+    # nano, instead of the _sbrk_r implementation from libmouros. To get around
     # this, newlib nano must be compiled with -DREENTRANT_SYSCALLS_PROVIDED.
     set_property(
         TARGET ${PROJECT_NAME}

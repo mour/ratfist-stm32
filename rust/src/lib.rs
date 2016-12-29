@@ -12,7 +12,9 @@ extern crate mouros_rust_bindings;
 
 
 #[lang = "panic_fmt"]
-extern "C" fn panic_fmt() -> ! {
-    loop {
-    }
+#[no_mangle]
+pub extern fn rust_begin_panic(_msg: core::fmt::Arguments,
+                               _file: &'static str,
+                               _line: u32) -> ! {
+    loop {}
 }

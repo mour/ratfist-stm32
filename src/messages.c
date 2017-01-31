@@ -327,7 +327,7 @@ static ssize_t serialize_spin_plan_reply(const struct message *msg,
 	ssize_t len = 0;
 
 	len = snprintf(output_buf, (unsigned long) output_buf_len,
-	               "%s,%hhu",
+	               "%s,%u",
 	               msg_name_lut[MSG_SPIN_PLAN_REPLY],
 	               data->channel_num);
 
@@ -368,7 +368,7 @@ static ssize_t serialize_spin_state_reply(const struct message *msg,
 	struct spin_state_data *data = msg->data;
 
 	ssize_t len = snprintf(output_buf, (size_t) output_buf_len,
-	                       "%s,%hhu,%s,%llu,%f",
+	                       "%s,%u,%s,%lu,%f",
 	                       msg_name_lut[MSG_SPIN_STATE_REPLY],
 	                       data->channel_num,
 	                       spin_state_lut[data->state],
@@ -458,7 +458,7 @@ ssize_t msg_serialize_message(const struct message *msg,
 	return -1;
 }
 
-struct message *msg_create_message(enum message_type type)
+struct message *msg_create_message(int32_t type)
 {
 	struct message *ret = os_pool_alloc_take(&msg_pool);
 	if (ret == NULL) {

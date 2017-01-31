@@ -64,9 +64,8 @@ pub struct spin_state_set_data {
 pub struct spin_state_data {
     pub channel_num: u8,
     pub state: i32,
-    pub plan_time_elapsed_msecs: u64,
+    pub plan_time_elapsed_msecs: u32,
     pub output_val_pct: f32,
-    _bindgen_padding_0_: [u8; 4usize],
 }
 
 #[repr(C)]

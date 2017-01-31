@@ -13,15 +13,13 @@
 
 #include "constants.h" // For MAX_SPIN_PLAN_LEGS, ...
 
-enum message_type {
-	MSG_SET_PLAN = 0,
-	MSG_GET_PLAN,
-	MSG_SPIN_PLAN_REPLY,
-	MSG_SET_SPIN_STATE,
-	MSG_GET_SPIN_STATE,
-	MSG_SPIN_STATE_REPLY,
-	MSG_NUM_MESSAGE_TYPES
-};
+#define MSG_SET_PLAN 0
+#define MSG_GET_PLAN 1
+#define MSG_SPIN_PLAN_REPLY 2
+#define MSG_SET_SPIN_STATE 3
+#define MSG_GET_SPIN_STATE 4
+#define MSG_SPIN_STATE_REPLY 5
+#define MSG_NUM_MESSAGE_TYPES 6
 
 /**
  * Used by SET_PLAN, SPIN_PLAN_REPLY.
@@ -44,35 +42,33 @@ struct spin_plan_channel {
 	uint8_t channel_num;
 };
 
-enum spin_state {
-	SPIN_STOPPED = 0, //!< STOPPED
-	SPIN_RUNNING,     //!< RUNNING
-	SPIN_SPINNING_DOWN,//!< SPINNING_DOWN
-	SPIN_NUM_SPIN_STATES
-};
+#define SPIN_STOPPED 0
+#define SPIN_RUNNING 1
+#define SPIN_SPINNING_DOWN 2
+#define SPIN_NUM_SPIN_STATES 3
 
 /**
  * Used by SET_SPIN_STATE
  */
 struct spin_state_set_data {
 	uint8_t channel_num;
-	enum spin_state state;
+	int32_t state;
 };
 
 /**
- * Used by SPIN_SATE_REPLY
+ * Used by SPIN_STATE_REPLY
  */
 struct spin_state_data {
 	uint8_t channel_num;
-	enum spin_state state;
-	uint64_t plan_time_elapsed_msecs;
+	int32_t state;
+	uint32_t plan_time_elapsed_msecs;
 	float output_val_pct;
 };
 
 
 
 struct message {
-	enum message_type type;
+	int32_t type;
 	void *data;
 };
 
@@ -83,7 +79,7 @@ ssize_t msg_serialize_message(const struct message *msg,
                               char *output_buf,
                               ssize_t output_buf_len);
 
-struct message *msg_create_message(enum message_type type);
+struct message *msg_create_message(int32_t type);
 void msg_free_message(struct message *msg);
 
 #endif /* MESSAGES_H_ */

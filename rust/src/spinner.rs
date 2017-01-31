@@ -38,7 +38,7 @@ struct Channel {
     state: ChannelState,
     plan: [PlanLeg; constants::MAX_SPIN_PLAN_LEGS as usize],
     plan_len: usize,
-    elapsed_time_msecs: u64,
+    elapsed_time_msecs: u32,
     output_val_pct: f32,
 }
 

@@ -23,6 +23,7 @@ union small_size_msg_data {
 	struct spin_plan_channel spin_plan_channel;
 	struct spin_state_set_data spin_state_set_data;
 	struct spin_state_data spin_state_data;
+	struct ret_val ret_val;
 };
 
 
@@ -32,7 +33,8 @@ static char *msg_name_lut[MSG_NUM_MESSAGE_TYPES] = {
 	"SPIN_PLAN_REPLY",
 	"SET_SPIN_STATE",
 	"GET_SPIN_STATE",
-	"SPIN_STATE_REPLY"
+	"SPIN_STATE_REPLY",
+	"RET_VAL"
 };
 
 static char *spin_state_lut[SPIN_NUM_SPIN_STATES] = {
@@ -387,6 +389,28 @@ static ssize_t serialize_spin_state_reply(const struct message *msg,
 	return len;
 }
 
+static ssize_t serialize_ret_val(const struct message *msg,
+                                 char *output_buf,
+                                 ssize_t output_buf_len)
+{
+	struct ret_val *data = msg->data;
+
+	ssize_t len = snprintf(output_buf, (size_t) output_buf_len,
+	                       "%s,%d",
+	                       msg_name_lut[MSG_RET_VAL],
+	                       data->ret_val);
+
+	if (len <= 0) {
+		errno = MESSAGE_FORMATTING_ERROR;
+		return -1;
+
+	} else if (len >= output_buf_len) {
+		errno = MESSAGE_BUF_TOO_SMALL_ERROR;
+		return -1;
+	}
+
+	return len;
+}
 
 
 void msg_init(void)
@@ -413,6 +437,22 @@ struct message *msg_parse_message(char *input_buf)
 	char *save_ptr = NULL;
 	char *token = strtok_r(input_buf, ",", &save_ptr);
 
+	char *end_ptr = NULL;
+	errno = NO_ERROR;
+	uint32_t transaction_id = strtoul(token, &end_ptr, 10);
+	if (errno != NO_ERROR ||
+	    end_ptr == token || *end_ptr != '\0') {
+
+		errno = MESSAGE_PARSING_ERROR;
+		return NULL;
+	}
+
+	token = strtok_r(NULL, ",", &save_ptr);
+	if (token == NULL) {
+		errno = MESSAGE_PARSING_ERROR;
+		return NULL;
+	}
+
 	struct message *ret_msg = NULL;
 
 	if (strcmp(token, msg_name_lut[MSG_SET_PLAN]) == 0) {
@@ -433,12 +473,16 @@ struct message *msg_parse_message(char *input_buf)
 		errno = UNKNOWN_MESSAGE_TYPE_ERROR;
 	}
 
+	if (ret_msg != NULL) {
+		ret_msg->transaction_id = transaction_id;
+	}
+
 	return ret_msg;
 }
 
 ssize_t msg_serialize_message(const struct message *msg,
-                           char *output_buf,
-                           ssize_t output_buf_len)
+                             char *output_buf,
+                             ssize_t output_buf_len)
 {
 
 	switch (msg->type) {
@@ -450,6 +494,10 @@ ssize_t msg_serialize_message(const struct message *msg,
 		return serialize_spin_state_reply(msg,
 		                                  output_buf,
 		                                  output_buf_len);
+	case MSG_RET_VAL:
+		return serialize_ret_val(msg,
+		                         output_buf,
+		                         output_buf_len);
 	default:
 		cm3_assert_failed();
 	}
@@ -476,6 +524,7 @@ struct message *msg_create_message(int32_t type)
 	case MSG_GET_SPIN_STATE:
 	case MSG_SET_SPIN_STATE:
 	case MSG_SPIN_STATE_REPLY:
+	case MSG_RET_VAL:
 		data = os_pool_alloc_take(&small_sized_msg_pool);
 		break;
 	default:
@@ -504,6 +553,7 @@ void msg_free_message(struct message *msg)
 	case MSG_GET_SPIN_STATE:
 	case MSG_SET_SPIN_STATE:
 	case MSG_SPIN_STATE_REPLY:
+	case MSG_RET_VAL:
 		os_pool_alloc_give(&small_sized_msg_pool, msg->data);
 		break;
 	default:

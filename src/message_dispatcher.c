@@ -60,7 +60,7 @@ static void process_outgoing_err_message(int32_t err_code,
                                          mailbox_t *tx_char_buffer);
 static void process_outgoing_message(struct message *msg,
                                      char *message_buf,
-                                     uint32_t len,
+                                     uint32_t max_len,
                                      mailbox_t *tx_char_buffer);
 
 
@@ -251,26 +251,38 @@ static void process_outgoing_err_message(int32_t err_code,
 
 static void process_outgoing_message(struct message *msg,
                                      char *message_buf,
-                                     uint32_t len,
+                                     uint32_t max_len,
                                      mailbox_t *tx_char_buffer)
 {
 	message_buf[0] = '$';
-	uint32_t total_len = 1;
+	uint32_t msg_len = 1;
 
-	ssize_t payload_len = msg_serialize_message(msg, &message_buf[1],
-	                                            (ssize_t) (len - 1));
+	ssize_t payload_len = snprintf(&message_buf[1],
+	                               max_len - 1,
+	                               "%u,", msg->transaction_id);
+
 	if (payload_len <= 0) {
+		dispatcher_send_err(MESSAGE_FORMATTING_ERROR);
+		goto free_msg;
+	}
+
+	ssize_t serialized_msg_len = msg_serialize_message(
+			msg, &message_buf[payload_len + 1],
+			(ssize_t) (max_len - (payload_len + 1)));
+
+	if (serialized_msg_len <= 0) {
 		dispatcher_send_err(errno);
 		goto free_msg;
 	}
 
+	payload_len += serialized_msg_len;
 
 	uint8_t csum = calc_checksum(&message_buf[1], (uint32_t) payload_len);
 
-	total_len += (uint32_t) payload_len;
+	msg_len += (uint32_t) payload_len;
 
-	int csum_len = snprintf(&message_buf[total_len],
-	                        len - total_len,
+	int csum_len = snprintf(&message_buf[msg_len],
+	                        max_len - msg_len,
 	                        "*%02X\r\n", csum);
 
 	if (csum_len <= 0) {
@@ -278,8 +290,8 @@ static void process_outgoing_message(struct message *msg,
 		goto free_msg;
 	}
 
-	total_len += (uint32_t) csum_len;
-	if (total_len >= len) {
+	msg_len += (uint32_t) csum_len;
+	if (msg_len >= max_len) {
 		dispatcher_send_err(MESSAGE_BUF_TOO_SMALL_ERROR);
 		goto free_msg;
 	}
@@ -287,7 +299,7 @@ static void process_outgoing_message(struct message *msg,
 
 	if (os_char_buffer_write_buf(tx_char_buffer,
 	                             message_buf,
-	                             total_len) != total_len) {
+	                             msg_len) != msg_len) {
 		dispatcher_send_err(TX_BUFFER_FULL);
 	}
 

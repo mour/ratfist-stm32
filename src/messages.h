@@ -19,7 +19,8 @@
 #define MSG_SET_SPIN_STATE 3
 #define MSG_GET_SPIN_STATE 4
 #define MSG_SPIN_STATE_REPLY 5
-#define MSG_NUM_MESSAGE_TYPES 6
+#define MSG_RET_VAL 6
+#define MSG_NUM_MESSAGE_TYPES 7
 
 /**
  * Used by SET_PLAN, SPIN_PLAN_REPLY.
@@ -40,6 +41,10 @@ struct spin_plan_data {
  */
 struct spin_plan_channel {
 	uint8_t channel_num;
+};
+
+struct ret_val {
+	int ret_val;
 };
 
 #define SPIN_STOPPED 0
@@ -69,6 +74,7 @@ struct spin_state_data {
 
 struct message {
 	int32_t type;
+	uint32_t transaction_id;
 	void *data;
 };
 

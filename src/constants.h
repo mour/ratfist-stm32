@@ -65,7 +65,7 @@
 /**
  * The stack size of the individual tasks.
  */
-#define TASK_STACK_SIZE 1000
+#define TASK_STACK_SIZE 4000
 
 /**
  * The MourOS task priority to be used with RX & TX communication tasks.

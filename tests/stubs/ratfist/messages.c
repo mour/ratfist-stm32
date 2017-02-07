@@ -58,7 +58,7 @@ ssize_t msg_serialize_message(const struct message *msg,
 	return mock_type(ssize_t);
 }
 
-struct message *msg_create_message(enum message_type type)
+struct message *msg_create_message(int type)
 {
 	check_expected(type);
 

@@ -71,12 +71,13 @@ static void parse_set_plan_msg_test(void **state)
 	will_return(os_pool_alloc_take, &test_msg);
 	will_return(os_pool_alloc_take, &test_data);
 
-	char test_str1[] = "SET_PLAN,0,12,32.3,42,12";
+	char test_str1[] = "123,SET_PLAN,0,12,32.3,42,12";
 	struct message *msg = msg_parse_message(test_str1);
 
 	assert_non_null(msg);
 
 	assert_int_equal(msg->type, MSG_SET_PLAN);
+	assert_int_equal(msg->transaction_id, 123);
 
 	struct spin_plan_data *sp_data = msg->data;
 
@@ -103,7 +104,7 @@ static void parse_set_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
 	char test_str2[MAX_SPIN_PLAN_LEGS * 10]; // Obviously big enough.
-	int len = sprintf(test_str2, "SET_PLAN,1");
+	int len = sprintf(test_str2, "0,SET_PLAN,1");
 	for (int i = 0; i < MAX_SPIN_PLAN_LEGS + 1; i++) {
 		len += sprintf(&test_str2[len], ",2,2");
 	}
@@ -117,7 +118,8 @@ static void parse_set_plan_msg_test(void **state)
 	expect_any(os_pool_alloc_take, alloc);
 	will_return(os_pool_alloc_take, NULL);
 
-	assert_null(msg_parse_message(test_str1));
+	char test_str3[] = "123,SET_PLAN,0,12,32.3,42,12";
+	assert_null(msg_parse_message(test_str3));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 
 	// Fail when allocating the plan_data struct
@@ -129,7 +131,8 @@ static void parse_set_plan_msg_test(void **state)
 	expect_any(os_pool_alloc_give, alloc);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	assert_null(msg_parse_message(test_str1));
+	char test_str4[] = "123,SET_PLAN,0,12,32.3,42,12";
+	assert_null(msg_parse_message(test_str4));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 
 
@@ -142,37 +145,7 @@ static void parse_set_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str3[] = "SET_PLAN,";
-
-	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str3));
-	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
-
-
-	expect_any_count(os_pool_alloc_take, alloc, 2);
-	will_return(os_pool_alloc_take, &test_msg);
-	will_return(os_pool_alloc_take, &test_data);
-
-	expect_any_count(os_pool_alloc_give, alloc, 2);
-	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
-	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
-
-	char test_str4[] = "SET_PLAN,-1,12,32,42,12";
-
-	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str4));
-	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
-
-
-	expect_any_count(os_pool_alloc_take, alloc, 2);
-	will_return(os_pool_alloc_take, &test_msg);
-	will_return(os_pool_alloc_take, &test_data);
-
-	expect_any_count(os_pool_alloc_give, alloc, 2);
-	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
-	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
-
-	char test_str5[] = "SET_PLAN,2";
+	char test_str5[] = "1,SET_PLAN,";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str5));
@@ -187,7 +160,7 @@ static void parse_set_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str6[] = "SET_PLAN,2,12,32,42";
+	char test_str6[] = "4,SET_PLAN,-1,12,32,42,12";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str6));
@@ -202,7 +175,7 @@ static void parse_set_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str7[] = "SET_PLAN,1,12,32a,42,12";
+	char test_str7[] = "2,SET_PLAN,2";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str7));
@@ -217,10 +190,40 @@ static void parse_set_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str8[] = "SET_PLAN,2,12,32,4D2,12l";
+	char test_str8[] = "3,SET_PLAN,2,12,32,42";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str8));
+	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
+
+
+	expect_any_count(os_pool_alloc_take, alloc, 2);
+	will_return(os_pool_alloc_take, &test_msg);
+	will_return(os_pool_alloc_take, &test_data);
+
+	expect_any_count(os_pool_alloc_give, alloc, 2);
+	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
+	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
+
+	char test_str9[] = "4,SET_PLAN,1,12,32a,42,12";
+
+	errno = NO_ERROR;
+	assert_null(msg_parse_message(test_str9));
+	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
+
+
+	expect_any_count(os_pool_alloc_take, alloc, 2);
+	will_return(os_pool_alloc_take, &test_msg);
+	will_return(os_pool_alloc_take, &test_data);
+
+	expect_any_count(os_pool_alloc_give, alloc, 2);
+	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
+	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
+
+	char test_str10[] = "5,SET_PLAN,2,12,32,4D2,12l";
+
+	errno = NO_ERROR;
+	assert_null(msg_parse_message(test_str10));
 	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
 
 }
@@ -237,12 +240,13 @@ static void parse_get_plan_msg_test(void **state)
 	will_return(os_pool_alloc_take, &test_msg);
 	will_return(os_pool_alloc_take, &test_data);
 
-	char test_str1[] = "GET_PLAN,0";
+	char test_str1[] = "124,GET_PLAN,0";
 	struct message *msg = msg_parse_message(test_str1);
 
 	assert_non_null(msg);
 
 	assert_int_equal(msg->type, MSG_GET_PLAN);
+	assert_int_equal(msg->transaction_id, 124);
 
 	struct spin_plan_channel *sp_data = msg->data;
 	assert_int_equal(sp_data->channel_num, 0);
@@ -259,7 +263,7 @@ static void parse_get_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str2[] = "GET_PLAN";
+	char test_str2[] = "999,GET_PLAN";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str2));
@@ -275,7 +279,7 @@ static void parse_get_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str3[] = "GET_PLAN,12345";
+	char test_str3[] = "0,GET_PLAN,12345";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str3));
@@ -291,7 +295,7 @@ static void parse_get_plan_msg_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str4[] = "GET_PLAN,6,abcd";
+	char test_str4[] = "123,GET_PLAN,6,abcd";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str4));
@@ -306,16 +310,18 @@ static void parse_get_plan_msg_test(void **state)
 	expect_any(os_pool_alloc_give, alloc);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
+	char test_str5[] = "123,GET_PLAN,6";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str5));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 
 
 	expect_any(os_pool_alloc_take, alloc);
 	will_return(os_pool_alloc_take, NULL);
 
+	char test_str6[] = "123,GET_PLAN,6";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str6));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 }
 
@@ -331,11 +337,12 @@ static void parse_set_spin_state_test(void **state)
 	will_return(os_pool_alloc_take, &test_msg);
 	will_return(os_pool_alloc_take, &test_data);
 
-	char test_str1[] = "SET_SPIN_STATE,1,ON";
+	char test_str1[] = "1,SET_SPIN_STATE,1,ON";
 	struct message *msg = msg_parse_message(test_str1);
 
 	assert_non_null(msg);
 	assert_int_equal(msg->type, MSG_SET_SPIN_STATE);
+	assert_int_equal(msg->transaction_id, 1);
 
 	struct spin_state_set_data *sp_data = msg->data;
 	assert_int_equal(sp_data->channel_num, 1);
@@ -350,10 +357,11 @@ static void parse_set_spin_state_test(void **state)
 	will_return(os_pool_alloc_take, &test_msg);
 	will_return(os_pool_alloc_take, &test_data);
 
-	char test_str2[] = "SET_SPIN_STATE,3,OFF";
+	char test_str2[] = "34,SET_SPIN_STATE,3,OFF";
 
 	assert_non_null(msg_parse_message(test_str2));
 	assert_int_equal(msg->type, MSG_SET_SPIN_STATE);
+	assert_int_equal(msg->transaction_id, 34);
 
 	sp_data = msg->data;
 	assert_int_equal(sp_data->channel_num, 3);
@@ -369,7 +377,7 @@ static void parse_set_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str3[] = "SET_SPIN_STATE,3a,OFF";
+	char test_str3[] = "3,SET_SPIN_STATE,3a,OFF";
 
 	errno = NO_ERROR;
 
@@ -386,7 +394,7 @@ static void parse_set_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str4[] = "SET_SPIN_STATE,6,SPINDOWN";
+	char test_str4[] = "9,SET_SPIN_STATE,6,SPINDOWN";
 
 	errno = NO_ERROR;
 
@@ -403,7 +411,7 @@ static void parse_set_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str5[] = "SET_SPIN_STATE,";
+	char test_str5[] = "8,SET_SPIN_STATE,";
 
 	errno = NO_ERROR;
 
@@ -419,7 +427,7 @@ static void parse_set_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str6[] = "SET_SPIN_STATE,10";
+	char test_str6[] = "111,SET_SPIN_STATE,10";
 
 	errno = NO_ERROR;
 
@@ -435,7 +443,7 @@ static void parse_set_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str7[] = "SET_SPIN_STATE,6,ON,HELLO";
+	char test_str7[] = "1234,SET_SPIN_STATE,6,ON,HELLO";
 
 	errno = NO_ERROR;
 
@@ -451,16 +459,17 @@ static void parse_set_spin_state_test(void **state)
 	expect_any(os_pool_alloc_give, alloc);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
+	char test_str8[] = "1234,SET_SPIN_STATE,6,ON";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str8));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
-
 
 	expect_any(os_pool_alloc_take, alloc);
 	will_return(os_pool_alloc_take, NULL);
 
+	char test_str9[] = "1234,SET_SPIN_STATE,6,ON";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str9));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 }
 
@@ -476,11 +485,12 @@ static void parse_get_spin_state_test(void **state)
 	will_return(os_pool_alloc_take, &test_msg);
 	will_return(os_pool_alloc_take, &test_data);
 
-	char test_str1[] = "GET_SPIN_STATE,1";
+	char test_str1[] = "1,GET_SPIN_STATE,1";
 	struct message *msg = msg_parse_message(test_str1);
 
 	assert_non_null(msg);
 	assert_int_equal(msg->type, MSG_GET_SPIN_STATE);
+	assert_int_equal(msg->transaction_id, 1);
 
 	struct spin_plan_channel *sp_data = msg->data;
 	assert_int_equal(sp_data->channel_num, 1);
@@ -495,7 +505,7 @@ static void parse_get_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str2[] = "GET_SPIN_STATE,1a";
+	char test_str2[] = "4,GET_SPIN_STATE,1a";
 
 	assert_null(msg_parse_message(test_str2));
 	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
@@ -510,7 +520,7 @@ static void parse_get_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str3[] = "GET_SPIN_STATE,";
+	char test_str3[] = "5,GET_SPIN_STATE,";
 
 	assert_null(msg_parse_message(test_str3));
 	assert_int_equal(errno, MESSAGE_PARSING_ERROR);
@@ -525,7 +535,7 @@ static void parse_get_spin_state_test(void **state)
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_data);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
-	char test_str4[] = "GET_SPIN_STATE,5,extra";
+	char test_str4[] = "6,GET_SPIN_STATE,5,extra";
 
 	assert_null(msg_parse_message(test_str4));
 	assert_int_equal(errno, MALFORMED_MESSAGE_ERROR);
@@ -539,16 +549,18 @@ static void parse_get_spin_state_test(void **state)
 	expect_any(os_pool_alloc_give, alloc);
 	expect_value(os_pool_alloc_give, block, (uintptr_t) &test_msg);
 
+	char test_str5[] = "6,GET_SPIN_STATE,5";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str5));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 
 
 	expect_any(os_pool_alloc_take, alloc);
 	will_return(os_pool_alloc_take, NULL);
 
+	char test_str6[] = "6,GET_SPIN_STATE,5";
 	errno = NO_ERROR;
-	assert_null(msg_parse_message(test_str1));
+	assert_null(msg_parse_message(test_str6));
 	assert_int_equal(errno, MEM_ALLOC_ERROR);
 }
 
@@ -737,7 +749,7 @@ static void unknown_messages_test(void **state)
 	(void) state;
 
 	// Try to parse an unknown message
-	char test_str1[] = "UNKNOWN_MESSAGE,1,23,1";
+	char test_str1[] = "123,UNKNOWN_MESSAGE,1,23,1";
 
 	errno = NO_ERROR;
 	assert_null(msg_parse_message(test_str1));

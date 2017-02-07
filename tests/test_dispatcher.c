@@ -27,6 +27,10 @@ char rx_buffer_data[200];
 mailbox_t bsp_tx_buffer;
 char tx_buffer_data[200];
 
+mailbox_t spinner_msg_queue;
+mailbox_t *SPINNER_MSG_QUEUE_PTR = &spinner_msg_queue;
+struct message spinner_msg_queue_buffer[20];
+
 static int setup(void **state)
 {
 	(void) state;
@@ -34,6 +38,11 @@ static int setup(void **state)
 
 	os_char_buffer_init(&bsp_rx_buffer, rx_buffer_data, 200, NULL);
 	os_char_buffer_init(&bsp_tx_buffer, tx_buffer_data, 200, NULL);
+
+	os_mailbox_init(SPINNER_MSG_QUEUE_PTR,
+	                spinner_msg_queue_buffer,
+	                20, sizeof(struct message),
+	                NULL);
 
 	return 0;
 }
@@ -94,6 +103,7 @@ static void send_msg_test(void **state)
 	// valid)
 	struct message test_msg = {
 		.type = MSG_SPIN_STATE_REPLY,
+		.transaction_id = 123,
 		.data = NULL
 	};
 
@@ -123,7 +133,7 @@ static void send_msg_test(void **state)
 	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
 	buf[len] = '\0';
 
-	assert_string_equal("$SERIALIZED_MESSAGE*06\r\n", buf);
+	assert_string_equal("$123,SERIALIZED_MESSAGE*1A\r\n", buf);
 
 	// The next iteration should not do anything.
 	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
@@ -168,15 +178,15 @@ static void send_msg_test(void **state)
 
 
 	// Try a situation where there's not enough room for the checksum.
-	char long_buf[BSP_MAX_MESSAGE_LENGTH];
-	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH);
+	char long_buf[BSP_MAX_MESSAGE_LENGTH - 6];
+	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH - 6);
 
 	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
 	expect_any(msg_serialize_message, output_buf);
 	expect_any(msg_serialize_message, output_buf_len);
 	msg_stubs_set_serialization_output(long_buf);
-	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 1);
-	long_buf[BSP_MAX_MESSAGE_LENGTH - 2] = '\0';
+	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 6);
+	long_buf[BSP_MAX_MESSAGE_LENGTH - 7] = '\0';
 
 	errno = MESSAGE_FORMATTING_ERROR;
 
@@ -203,14 +213,14 @@ static void send_msg_test(void **state)
 
 
 	// Try a situation where there's not enough room for the checksum.
-	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH);
+	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH - 6);
 
 	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
 	expect_any(msg_serialize_message, output_buf);
 	expect_any(msg_serialize_message, output_buf_len);
 	msg_stubs_set_serialization_output(long_buf);
-	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 1);
-	long_buf[BSP_MAX_MESSAGE_LENGTH - 2] = '\0';
+	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 6);
+	long_buf[BSP_MAX_MESSAGE_LENGTH - 7] = '\0';
 	errno = MESSAGE_FORMATTING_ERROR;
 
 	// Add the message to the outgoing queue.

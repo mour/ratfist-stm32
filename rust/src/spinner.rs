@@ -56,81 +56,118 @@ impl Default for Channel {
 }
 
 impl Channel {
-    fn send_event(&mut self, event: SpinnerEvent) {
+    fn send_event(&mut self, trans_id: u32, event: SpinnerEvent) {
         match self.state {
             ChannelState::Stopped => {
                 match event {
                     SpinnerEvent::SetPlan(data) => {
                         self.set_channel_plan(data);
+                        self.send_return_val(trans_id, 0);
                     }
                     SpinnerEvent::GetPlan => {
-                        self.send_reply(messages::MsgTypes::SPIN_PLAN_REPLY);
+                        self.send_spin_plan_reply(trans_id);
                     }
                     SpinnerEvent::SetState(data) => {
                         self.set_channel_state(data);
+                        self.send_return_val(trans_id, 0);
                     }
                     SpinnerEvent::GetState => {
-                        self.send_reply(messages::MsgTypes::SPIN_STATE_REPLY);
+                        self.send_spin_state_reply(trans_id);
                     }
                 }
             }
             ChannelState::Running => {
                 match event {
                     SpinnerEvent::GetPlan => {
-                        self.send_reply(messages::MsgTypes::SPIN_PLAN_REPLY);
+                        self.send_spin_plan_reply(trans_id);
                     }
                     SpinnerEvent::SetState(data) => {
                         self.set_channel_state(data);
+                        self.send_return_val(trans_id, 0);
                     }
                     SpinnerEvent::GetState => {
-                        self.send_reply(messages::MsgTypes::SPIN_PLAN_REPLY);
+                        self.send_spin_state_reply(trans_id);
                     }
-                    _ => {}
+                    _ => {
+                        self.send_return_val(trans_id, 1);
+                    }
                 }
             }
             ChannelState::Spindown => {
                 match event {
                     SpinnerEvent::GetPlan => {
-                        self.send_reply(messages::MsgTypes::SPIN_PLAN_REPLY);
+                        self.send_spin_plan_reply(trans_id);
                     }
                     SpinnerEvent::GetState => {
-                        self.send_reply(messages::MsgTypes::SPIN_PLAN_REPLY);
+                        self.send_spin_state_reply(trans_id);
                     }
-                    _ => {}
+                    _ => {
+                        self.send_return_val(trans_id, 1);
+                    }
                 }
             }
         }
     }
 
-    fn send_reply(&self, msg_type: i32) {
-        let mut msg = if let Ok(msg) = messages::MessageWrapper::new(msg_type) {
+    fn send_spin_plan_reply(&self, trans_id: u32) {
+        let mut msg = if let Ok(msg) =
+            messages::MessageWrapper::new(trans_id, messages::MsgTypes::SPIN_PLAN_REPLY) {
             msg
         } else {
             return;
         };
 
-        match *msg {
-            messages::Message::SpinPlanReply(ref mut data) => {
-                data.channel_num = self.id;
-                data.spin_plan_leg_count = self.plan_len as u32;
-                for leg_idx in 0..self.plan_len {
-                    data.plan_legs[leg_idx].duration_msecs = self.plan[leg_idx].duration_msecs;
-                    data.plan_legs[leg_idx].target_pct = self.plan[leg_idx].target_pct;
-                }
+        if let messages::Message::SpinPlanReply(ref mut data) = *msg {
+            data.channel_num = self.id;
+            data.spin_plan_leg_count = self.plan_len as u32;
+            for leg_idx in 0..self.plan_len {
+                data.plan_legs[leg_idx].duration_msecs = self.plan[leg_idx].duration_msecs;
+                data.plan_legs[leg_idx].target_pct = self.plan[leg_idx].target_pct;
             }
-            messages::Message::SpinStateReply(ref mut data) => {
-                data.channel_num = self.id;
-                data.state = match self.state {
-                    ChannelState::Stopped => messages::SpinStates::STOPPED,
-                    ChannelState::Running => messages::SpinStates::RUNNING,
-                    ChannelState::Spindown => messages::SpinStates::SPINNING_DOWN,
-                };
-                data.plan_time_elapsed_msecs = self.elapsed_time_msecs;
-                data.output_val_pct = self.output_val_pct;
-            }
-            _ => {
-                return;
-            }
+        } else {
+            return;
+        }
+
+        message_dispatcher::send_message(msg);
+    }
+
+    fn send_spin_state_reply(&self, trans_id: u32) {
+        let mut msg = if let Ok(msg) =
+            messages::MessageWrapper::new(trans_id, messages::MsgTypes::SPIN_STATE_REPLY) {
+            msg
+        } else {
+            return;
+        };
+
+        if let messages::Message::SpinStateReply(ref mut data) = *msg {
+            data.channel_num = self.id;
+            data.state = match self.state {
+                ChannelState::Stopped => messages::SpinStates::STOPPED,
+                ChannelState::Running => messages::SpinStates::RUNNING,
+                ChannelState::Spindown => messages::SpinStates::SPINNING_DOWN,
+            };
+            data.plan_time_elapsed_msecs = self.elapsed_time_msecs;
+            data.output_val_pct = self.output_val_pct;
+
+        } else {
+            return;
+        }
+
+        message_dispatcher::send_message(msg);
+    }
+
+    fn send_return_val(&self, trans_id: u32, ret_val: i32) {
+        let mut msg = if let Ok(msg) = messages::MessageWrapper::new(trans_id,
+                                                                     messages::MsgTypes::RET_VAL) {
+            msg
+        } else {
+            return;
+        };
+
+        if let messages::Message::ReturnValue(ref mut data) = *msg {
+            data.ret_val = ret_val;
+        } else {
+            return;
         }
 
         message_dispatcher::send_message(msg);
@@ -210,30 +247,30 @@ pub extern "C" fn spinner_comm_loop(context_ptr: *mut CVoid) {
     };
 
     if let Some(msg_ptr) = context.msg_buf.read() {
-        if let Ok(msg) = messages::MessageWrapper::from_raw(msg_ptr) {
+        if let Ok((trans_id, msg)) = messages::MessageWrapper::from_raw(msg_ptr) {
             match *msg {
                 messages::Message::SetSpinPlan(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        context.channels[ch_num].send_event(SpinnerEvent::SetPlan(data));
+                        context.channels[ch_num].send_event(trans_id, SpinnerEvent::SetPlan(data));
                     }
                 }
                 messages::Message::GetSpinPlan(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        context.channels[ch_num].send_event(SpinnerEvent::GetPlan);
+                        context.channels[ch_num].send_event(trans_id, SpinnerEvent::GetPlan);
                     }
                 }
                 messages::Message::SetSpinState(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        context.channels[ch_num].send_event(SpinnerEvent::SetState(data));
+                        context.channels[ch_num].send_event(trans_id, SpinnerEvent::SetState(data));
                     }
                 }
                 messages::Message::GetSpinState(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        context.channels[ch_num].send_event(SpinnerEvent::GetState);
+                        context.channels[ch_num].send_event(trans_id, SpinnerEvent::GetState);
                     }
                 }
                 _ => {}

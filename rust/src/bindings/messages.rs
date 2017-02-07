@@ -16,6 +16,7 @@ pub mod MsgTypes {
     pub const SET_SPIN_STATE: i32 = 3;
     pub const GET_SPIN_STATE: i32 = 4;
     pub const SPIN_STATE_REPLY: i32 = 5;
+    pub const RET_VAL: i32 = 6;
 }
 
 
@@ -45,6 +46,11 @@ pub struct spin_channel {
     pub channel_num: u8,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ret_val {
+    pub ret_val: i32,
+}
 
 pub mod SpinStates {
     pub const STOPPED: i32 = 0;
@@ -72,6 +78,7 @@ pub struct spin_state_data {
 #[derive(Copy, Clone)]
 pub struct message {
     msg_type: i32,
+    transaction_id: u32,
     data: *mut CVoid,
 }
 
@@ -83,6 +90,7 @@ pub enum Message<'a> {
     SetSpinState(&'a mut spin_state_set_data),
     GetSpinState(&'a mut spin_channel),
     SpinStateReply(&'a mut spin_state_data),
+    ReturnValue(&'a mut ret_val),
 }
 
 pub struct MessageWrapper<'a> {
@@ -128,11 +136,21 @@ extern "C" {
 
 
 impl<'a> MessageWrapper<'a> {
-    pub fn new(msg_type: i32) -> Result<MessageWrapper<'a>, ()> {
-        unsafe { MessageWrapper::from_raw(msg_create_message(msg_type)) }
+    pub fn new(trans_id: u32, msg_type: i32) -> Result<MessageWrapper<'a>, ()> {
+        unsafe {
+            let mut msg = msg_create_message(msg_type);
+
+            if msg.is_null() {
+                return Err(());
+            }
+
+            (*msg).transaction_id = trans_id;
+
+            Ok(MessageWrapper::from_raw(msg)?.1)
+        }
     }
 
-    pub fn from_raw(msg_ptr: *mut message) -> Result<MessageWrapper<'a>, ()> {
+    pub fn from_raw(msg_ptr: *mut message) -> Result<(u32, MessageWrapper<'a>), ()> {
         unsafe {
             if msg_ptr.is_null() || (*msg_ptr).data.is_null() {
                 return Err(());
@@ -157,15 +175,18 @@ impl<'a> MessageWrapper<'a> {
                 MsgTypes::SPIN_STATE_REPLY => {
                     Message::SpinStateReply(&mut *((*msg_ptr).data as *mut spin_state_data))
                 }
+                MsgTypes::RET_VAL => Message::ReturnValue(&mut *((*msg_ptr).data as *mut ret_val)),
                 _ => {
+                    msg_free_message(msg_ptr);
                     return Err(());
                 }
             };
 
-            Ok(MessageWrapper {
-                msg_ptr: msg_ptr,
-                payload: payload,
-            })
+            Ok(((*msg_ptr).transaction_id,
+                MessageWrapper {
+                    msg_ptr: msg_ptr,
+                    payload: payload,
+                }))
         }
     }
 }

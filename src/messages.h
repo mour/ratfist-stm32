@@ -44,7 +44,7 @@ struct spin_plan_channel {
 };
 
 struct ret_val {
-	int ret_val;
+	int32_t ret_val;
 };
 
 #define SPIN_STOPPED 0

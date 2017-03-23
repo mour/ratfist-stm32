@@ -63,6 +63,12 @@
 #define MAX_OUTBOUND_MESSAGES 15
 
 /**
+ * The maximum number of normal messages, that can be buffered after receiving at
+ * any given time.
+ */
+#define MAX_INBOUND_MESSAGES 15
+
+/**
  * The stack size of the individual tasks.
  */
 #define TASK_STACK_SIZE 4000
@@ -77,6 +83,12 @@
  * before checking the queue again.
  */
 #define COMM_TASK_SLEEP_TIME_TICKS 50
+
+/**
+ * The maximum number of subsystems that can be registered with the message
+ * dispatcher.
+ */
+#define MAX_NUM_COMM_SUBSYSTEMS 5
 
 #endif /* CONSTANTS_H_ */
 

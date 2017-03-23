@@ -11,7 +11,6 @@ pub mod BoardLed {
 }
 
 extern "C" {
-    #![allow(improper_ctypes)]
     pub static mut bsp_rx_buffer: mailbox::Mailbox<u8>;
     pub static mut bsp_tx_buffer: mailbox::Mailbox<u8>;
 }

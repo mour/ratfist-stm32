@@ -1,8 +1,7 @@
+#![feature(try_from)]
 #![feature(lang_items)]
 #![no_std]
 
-#[macro_use]
-mod machine;
 mod bindings;
 
 pub mod spinner;

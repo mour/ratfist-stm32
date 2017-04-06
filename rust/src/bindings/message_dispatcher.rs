@@ -58,8 +58,8 @@ pub trait MemManagement {
     fn free(msg_ptr: *mut message);
 }
 
-pub trait Wrappable: MemManagement + TryFrom<*mut message, Err = ()> {}
-impl<T> Wrappable for T where T: MemManagement + TryFrom<*mut message, Err = ()> {}
+pub trait Wrappable: MemManagement + TryFrom<*mut message, Error = ()> {}
+impl<T> Wrappable for T where T: MemManagement + TryFrom<*mut message, Error = ()> {}
 
 
 
@@ -108,9 +108,9 @@ impl<T> Into<*mut message> for MessageWrapper<T>
 impl<T> TryFrom<*mut message> for MessageWrapper<T>
     where T: Wrappable
 {
-    type Err = ();
+    type Error = ();
 
-    fn try_from(raw_msg_ptr: *mut message) -> Result<Self, Self::Err> {
+    fn try_from(raw_msg_ptr: *mut message) -> Result<Self, Self::Error> {
         unsafe {
             if raw_msg_ptr.is_null() || (*raw_msg_ptr).data.is_null() {
                 return Err(());

@@ -91,9 +91,9 @@ impl<'a> message_dispatcher::MemManagement for Message<'a> {
 
 
 impl<'a> TryFrom<*mut message_dispatcher::message> for Message<'a> {
-    type Err = ();
+    type Error = ();
 
-    fn try_from(raw_msg_ptr: *mut message_dispatcher::message) -> Result<Self, Self::Err> {
+    fn try_from(raw_msg_ptr: *mut message_dispatcher::message) -> Result<Self, Self::Error> {
         unsafe {
             if raw_msg_ptr.is_null() || (*raw_msg_ptr).data.is_null() {
                 return Err(());

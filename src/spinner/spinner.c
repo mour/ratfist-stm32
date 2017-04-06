@@ -71,12 +71,12 @@ static struct message_handler msg_handlers[] = {
 		.serialization_func = NULL
 	},
 	{
-		.message_name = "GET_SPIN_STATE",
+		.message_name = "GET_STATE",
 		.parsing_func = parse_get_state,
 		.serialization_func = NULL
 	},
 	{
-		.message_name = "SPIN_STATE_REPLY",
+		.message_name = "STATE_REPLY",
 		.parsing_func = NULL,
 		.serialization_func = serialize_state_reply
 	},
@@ -128,7 +128,7 @@ static bool parse_set_plan(struct message *msg, char *save_ptr)
 		token = strtok_r(NULL, ",", &save_ptr);
 		if (token == NULL) {
 			// End of the packet.
-			data->spin_plan_leg_count = i;
+			data->plan_leg_count = i;
 			break;
 		}
 
@@ -276,13 +276,24 @@ static ssize_t serialize_plan_reply(const struct message *msg,
 	struct spin_plan_data *data = msg->data;
 
 	ssize_t len = 0;
+	ssize_t curr_len = snprintf(output_buf, (size_t) output_buf_len,
+	                            ",%u", data->channel_num);
 
-	for (uint32_t i = 0; i < data->spin_plan_leg_count; i++) {
-		ssize_t curr_len = snprintf(&output_buf[len],
-				            (size_t) ((ssize_t) output_buf_len - len),
-		                            ",%lu,%f",
-		                            data->plan_legs[i].duration_msecs,
-		                            data->plan_legs[i].target_pct);
+	if (curr_len <= 0) {
+		return -1;
+	}
+
+	len += curr_len;
+	if ((uint32_t ) len >= output_buf_len) {
+		return -1;
+	}
+
+	for (uint32_t i = 0; i < data->plan_leg_count; i++) {
+		curr_len = snprintf(&output_buf[len],
+		                    (size_t) ((ssize_t) output_buf_len - len),
+		                    ",%lu,%f",
+		                    data->plan_legs[i].duration_msecs,
+		                    data->plan_legs[i].target_pct);
 
 		if (curr_len <= 0) {
 			return -1;
@@ -304,8 +315,7 @@ static ssize_t serialize_state_reply(const struct message *msg,
 	struct spin_state_data *data = msg->data;
 
 	ssize_t len = snprintf(output_buf, (size_t) output_buf_len,
-	                       "%s,%u,%s,%lu,%f",
-	                       msg_handlers[SPINNER_MSG_STATE_REPLY].message_name,
+	                       ",%u,%s,%lu,%f",
 	                       data->channel_num,
 	                       spin_state_lut[data->state],
 	                       data->plan_time_elapsed_msecs,

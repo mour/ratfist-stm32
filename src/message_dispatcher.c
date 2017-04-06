@@ -148,7 +148,7 @@ static void assemble_incoming_message(void *params)
 		// Message too long? Can't really recover from that, so just drop this message, and wait for the next
 		// one.
 		if (*pos_in_buf >= BSP_MAX_MESSAGE_LENGTH) {
-			schedule_err_message(context->err_msg_queue, INCOMING_MESSAGE_TOO_LONG_ERROR);
+			schedule_err_message(context->err_msg_queue, MESSAGE_TOO_LONG_ERROR);
 			*pos_in_buf = 0;
 			*msg_is_incoming = false;
 		}
@@ -235,6 +235,7 @@ static void process_incoming_message(struct rx_worker_context *ctx)
 
 	if (subsystem_name == NULL || msg_name == NULL) {
 		schedule_err_message(ctx->err_msg_queue, MESSAGE_PARSING_ERROR);
+		return;
 	}
 
 	for (uint32_t i = 0; i < ctx->subsystems->num_subsystems; i++) {
@@ -248,21 +249,23 @@ static void process_incoming_message(struct rx_worker_context *ctx)
 
 					// Check we have a parsing function
 					if (conf->message_handlers[msg_idx].parsing_func == NULL) {
-						schedule_err_message(ctx->err_msg_queue, -1); // TODO add err code
+						schedule_err_message(ctx->err_msg_queue, MISSING_MESSAGE_HANDLER_ERROR);
 						return;
 					}
 
 					// Try to allocate a msg struct
 					struct message *msg = conf->alloc_message(msg_idx);
 					if (msg == NULL) {
-						schedule_err_message(ctx->err_msg_queue, -1); // TODO add err code
+						schedule_err_message(ctx->err_msg_queue, MEM_ALLOC_ERROR);
 						return;
 					}
+
+					msg->type = msg_idx;
 					msg->transaction_id = transaction_id;
 
 					// Try to parse the message
 					if (!conf->message_handlers[msg_idx].parsing_func(msg, save_ptr)) {
-						schedule_err_message(ctx->err_msg_queue, -1); // TODO add err code
+						schedule_err_message(ctx->err_msg_queue, MESSAGE_PARSING_ERROR);
 
 						conf->free_message(msg);
 						return;
@@ -270,7 +273,7 @@ static void process_incoming_message(struct rx_worker_context *ctx)
 
 					// Send the message to the subsystem
 					if (!os_mailbox_write(conf->incoming_msg_queue, &msg)) {
-						schedule_err_message(ctx->err_msg_queue, -2); // TODO add err code
+						schedule_err_message(ctx->err_msg_queue, MESSAGE_ROUTING_ERROR);
 
 						conf->free_message(msg);
 						return;
@@ -282,13 +285,13 @@ static void process_incoming_message(struct rx_worker_context *ctx)
 			}
 
 			// Found a subsystem, but not a message parsing function.
-			schedule_err_message(ctx->err_msg_queue, -3); // TODO add err code
+			schedule_err_message(ctx->err_msg_queue, UNKNOWN_MESSAGE_TYPE_ERROR);
 			return;
 		}
 	}
 
 	// Could not find subsystem
-	schedule_err_message(ctx->err_msg_queue, -4); // TODO add err code
+	schedule_err_message(ctx->err_msg_queue, UNKNOWN_SUBSYSTEM_ERROR);
 }
 
 
@@ -337,6 +340,13 @@ static void process_outgoing_message(mailbox_t *tx_char_buffer,
                                      struct message *msg,
                                      mailbox_t *err_msg_queue)
 {
+	if (msg->type >= conf->num_message_types ||
+	    conf->message_handlers[msg->type].serialization_func == NULL) {
+
+		schedule_err_message(err_msg_queue, MISSING_MESSAGE_HANDLER_ERROR);
+		goto free_msg;
+	}
+
 	char message_buf[BSP_MAX_MESSAGE_LENGTH];
 	message_buf[0] = '$';
 	uint32_t total_len = 1;
@@ -377,7 +387,7 @@ static void process_outgoing_message(mailbox_t *tx_char_buffer,
 
 	total_len += (uint32_t) csum_len;
 	if (total_len >= ARRAY_SIZE(message_buf)) {
-		schedule_err_message(err_msg_queue, MESSAGE_FORMATTING_ERROR);
+		schedule_err_message(err_msg_queue, MESSAGE_TOO_LONG_ERROR);
 		goto free_msg;
 	}
 
@@ -448,6 +458,8 @@ void dispatcher_deinit(void)
 
 	worker_join(&rx_worker);
 	worker_join(&tx_worker);
+
+	subsystems.num_subsystems = 0;
 }
 
 bool dispatcher_register_subsystem(struct subsystem_message_conf *conf)

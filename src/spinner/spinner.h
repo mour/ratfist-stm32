@@ -42,7 +42,7 @@
 struct spin_plan_data {
 	uint8_t channel_num;
 
-	uint32_t spin_plan_leg_count;
+	uint32_t plan_leg_count;
 
 	struct pwm_leg {
 		uint32_t duration_msecs;

@@ -55,20 +55,23 @@ add_compile_options(
 
 
 
-# Message factory tests
-add_executable(test_messages
-    "${CMAKE_CURRENT_LIST_DIR}/../src/messages.h"
-    "${CMAKE_CURRENT_LIST_DIR}/../src/messages.c"
-    "${CMAKE_CURRENT_LIST_DIR}/test_messages.c"
-    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/tests/stubs/mouros/pool_alloc.c"
+# Spinner tests
+add_executable(test_spinner
+    "${CMAKE_CURRENT_LIST_DIR}/../src/spinner/spinner.h"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/spinner/spinner.c"
+    "${CMAKE_CURRENT_LIST_DIR}/test_spinner.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/pool_alloc.c"
+    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/mailbox.c"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/worker.c"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/message_dispatcher.c"
 )
 
-set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/../src/messages.c" PROPERTIES COMPILE_FLAGS "--coverage")
+set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/../src/spinner/spinner.c" PROPERTIES COMPILE_FLAGS "--coverage")
 
-add_test(NAME messages COMMAND test_messages)
-set_tests_properties(messages PROPERTIES DEPENDS test_messages)
+add_test(NAME spinner COMMAND test_spinner)
+set_tests_properties(spinner PROPERTIES DEPENDS test_spinner)
 
-add_dependencies(test_messages cmocka)
+add_dependencies(test_spinner cmocka)
 
 
 
@@ -77,11 +80,9 @@ add_executable(test_dispatcher
     "${CMAKE_CURRENT_LIST_DIR}/../src/message_dispatcher.h"
     "${CMAKE_CURRENT_LIST_DIR}/../src/message_dispatcher.c"
     "${CMAKE_CURRENT_LIST_DIR}/test_dispatcher.c"
-    "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/pool_alloc.c"
     "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/mailbox.c"
     "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/char_buffer.c"
     "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/tests/stubs/mouros/tasks.c"
-    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/messages.c"
     "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/worker.c"
 )
 

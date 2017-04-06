@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <mouros/char_buffer.h>
+#include <mouros/common.h>
 
 #include <ratfist_stubs/worker_stub_helpers.h>
 #include <ratfist_stubs/messages_stub_helpers.h>
@@ -21,28 +22,166 @@
 #include "../src/errors.h"
 #include "../src/message_dispatcher.h"
 
+struct fake_data_struct {};
+
 mailbox_t bsp_rx_buffer;
 char rx_buffer_data[200];
 
 mailbox_t bsp_tx_buffer;
 char tx_buffer_data[200];
 
-mailbox_t spinner_msg_queue;
-mailbox_t *SPINNER_MSG_QUEUE_PTR = &spinner_msg_queue;
-struct message spinner_msg_queue_buffer[20];
+
+mailbox_t outgoing_msg_queue;
+struct message *outgoing_msg_queue_buf[10];
+
+mailbox_t incoming_msg_queue;
+struct message *incoming_msg_queue_buf[10];
+
+mailbox_t outgoing_err_queue;
+int32_t outgoing_err_queue_buf[10];
+
+static char serialized_msg_buf[2 * BSP_MAX_MESSAGE_LENGTH];
+
+static struct message *fake_alloc(uint32_t message_type)
+{
+	check_expected(message_type);
+
+	return mock_ptr_type(struct message*);
+}
+
+static void fake_free(struct message *msg_ptr)
+{
+	check_expected_ptr(msg_ptr);
+}
+
+static bool msg_parsing_func(struct message *msg_ptr, char *save_ptr)
+{
+	check_expected_ptr(msg_ptr);
+
+	return mock_type(bool);
+}
+
+static ssize_t msg_serialization_func(const struct message *msg_ptr,
+                                      char *output_str,
+                                      uint32_t output_str_max_len)
+{
+	check_expected_ptr(msg_ptr);
+
+	ssize_t ret_val = mock_type(ssize_t);
+
+	if (ret_val > 0) {
+		strncpy(output_str, serialized_msg_buf, output_str_max_len);
+	}
+
+	return ret_val;
+}
+
+#define FAKE_SER_DES_MESSAGE 0
+#define FAKE_SER_ONLY_MESSAGE 1
+#define FAKE_DES_ONLY_MESSAGE 2
+#define FAKE_NO_SER_DES_MESSAGE 3
+
+struct message_handler handlers[] = {
+	{
+		.message_name = "SER_DES_MESSAGE",
+		.parsing_func = msg_parsing_func,
+		.serialization_func = msg_serialization_func,
+	},
+	{
+		.message_name = "SER_ONLY_MESSAGE",
+		.parsing_func = NULL,
+		.serialization_func = msg_serialization_func,
+	},
+	{
+		.message_name = "DES_ONLY_MESSAGE",
+		.parsing_func = msg_parsing_func,
+		.serialization_func = NULL,
+	},
+	{
+		.message_name = "NO_SER_DES_MESSAGE",
+		.parsing_func = NULL,
+		.serialization_func = NULL,
+	}
+};
+
+struct subsystem_message_conf fake_subsystem = {
+	.subsystem_name = "FAKE",
+	.outgoing_msg_queue = &outgoing_msg_queue,
+	.incoming_msg_queue = &incoming_msg_queue,
+	.outgoing_err_queue = &outgoing_err_queue,
+	.message_handlers = handlers,
+	.num_message_types = ARRAY_SIZE(handlers),
+	.alloc_message = fake_alloc,
+	.free_message = fake_free
+};
+
+struct subsystem_message_conf mini_fake_subsystem = {
+	.subsystem_name = "MINI_FAKE",
+	.outgoing_msg_queue = NULL,
+	.incoming_msg_queue = NULL,
+	.outgoing_err_queue = NULL,
+	.message_handlers = NULL,
+	.num_message_types = 0,
+	.alloc_message = NULL,
+	.free_message = NULL
+};
+
+static struct worker_init_data *get_rx_worker(void)
+{
+	struct worker_init_data *init_data = NULL;
+	assert_int_equal(worker_stubs_get_workers(&init_data), 2);
+
+	return &init_data[0];
+}
+
+static struct worker_init_data *get_tx_worker(void)
+{
+	struct worker_init_data *init_data = NULL;
+	assert_int_equal(worker_stubs_get_workers(&init_data), 2);
+
+	return &init_data[1];
+}
+
 
 static int setup(void **state)
 {
 	(void) state;
 	worker_stubs_init();
 
-	os_char_buffer_init(&bsp_rx_buffer, rx_buffer_data, 200, NULL);
-	os_char_buffer_init(&bsp_tx_buffer, tx_buffer_data, 200, NULL);
+	os_char_buffer_init(&bsp_rx_buffer, rx_buffer_data, sizeof(rx_buffer_data), NULL);
+	os_char_buffer_init(&bsp_tx_buffer, tx_buffer_data, sizeof(tx_buffer_data), NULL);
 
-	os_mailbox_init(SPINNER_MSG_QUEUE_PTR,
-	                spinner_msg_queue_buffer,
-	                20, sizeof(struct message),
+	os_mailbox_init(&outgoing_msg_queue,
+	                outgoing_msg_queue_buf,
+	                ARRAY_SIZE(outgoing_msg_queue_buf),
+	                sizeof(struct message*),
 	                NULL);
+	os_mailbox_init(&incoming_msg_queue,
+	                incoming_msg_queue_buf,
+	                ARRAY_SIZE(incoming_msg_queue_buf),
+	                sizeof(struct message*),
+	                NULL);
+	os_mailbox_init(&outgoing_err_queue,
+	                outgoing_err_queue_buf,
+	                ARRAY_SIZE(outgoing_err_queue_buf),
+	                sizeof(struct message*),
+	                NULL);
+
+	expect_any_count(worker_task_init, worker, 2);
+	expect_any_count(worker_task_init, name, 2);
+	expect_any_count(worker_task_init, stack_base, 2);
+	expect_any_count(worker_task_init, stack_size, 2);
+	expect_any_count(worker_task_init, priority, 2);
+	expect_any_count(worker_task_init, action, 2);
+	expect_any_count(worker_task_init, action_params, 2);
+	will_return_count(worker_task_init, true, 2);
+
+	expect_any_count(worker_start, worker, 2);
+	will_return_count(worker_start, true, 2);
+
+	dispatcher_init();
+	assert_true(dispatcher_register_subsystem(&mini_fake_subsystem));
+	assert_true(dispatcher_register_subsystem(&fake_subsystem));
 
 	return 0;
 }
@@ -51,6 +190,11 @@ static int teardown(void **state)
 {
 	(void) state;
 	worker_stubs_deinit();
+
+	expect_any_count(worker_stop, worker, 2);
+	expect_any_count(worker_join, worker, 2);
+
+	dispatcher_deinit();
 
 	return 0;
 }
@@ -80,437 +224,486 @@ static void init_test(void **state)
 	will_return(worker_task_init, true);
 
 	// Task registration
-	expect_any(worker_start, worker);
-	will_return(worker_start, true);
-	expect_any(worker_start, worker);
-	will_return(worker_start, true);
+	expect_any_count(worker_start, worker, 2);
+	will_return_count(worker_start, true, 2);
 
 	dispatcher_init();
+
+	struct subsystem_message_conf conf = {0};
+
+	for (uint8_t i = 0; i < MAX_NUM_COMM_SUBSYSTEMS; i++) {
+		assert_true(dispatcher_register_subsystem(&conf));
+	}
+
+	assert_false(dispatcher_register_subsystem(&conf));
+
+	expect_any_count(worker_stop, worker, 2);
+	expect_any_count(worker_join, worker, 2);
+
+	dispatcher_deinit();
 }
 
 static void send_msg_test(void **state)
 {
-	init_test(state);
+	(void) state;
 
-	struct worker_init_data *init_data = NULL;
-	assert_int_equal(worker_stubs_get_workers(&init_data), 2);
+	struct worker_init_data *tx_worker = get_tx_worker();
 
-	// Check we have the correct worker task
-	assert_string_equal(init_data[1].name, "tx_worker");
-	assert_ptr_equal(init_data[1].action_params, &bsp_tx_buffer);
 
-	// Setup a message (as we're using msg stubs, it doesn't need to be
-	// valid)
-	struct message test_msg = {
-		.type = MSG_SPIN_STATE_REPLY,
-		.transaction_id = 123,
-		.data = NULL
+	// No msg in queue
+	expect_any(os_task_sleep, num_ticks);
+	tx_worker->action(tx_worker->action_params);
+	assert_int_equal(bsp_tx_buffer.read_pos, bsp_tx_buffer.write_pos);
+
+
+	struct fake_data_struct fake_data;
+	struct message msg = {
+		.type = FAKE_SER_DES_MESSAGE,
+		.transaction_id = 1235,
+		.data = &fake_data
 	};
 
+	struct message *msg_p = &msg;
 
-	// Add the message to the outgoing queue.
-	dispatcher_send_message(&test_msg);
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
 
-	// Check tx buffer is empty.
-	char buf[200];
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
+	strcpy(serialized_msg_buf, ",PAYLOAD");
 
-	// Setup the serialization function.
-	char serialized_msg[] = "SERIALIZED_MESSAGE";
-	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
-	expect_any(msg_serialize_message, output_buf);
-	expect_any(msg_serialize_message, output_buf_len);
-	msg_stubs_set_serialization_output(serialized_msg);
-	will_return(msg_serialize_message, sizeof(serialized_msg) - 1);
+	expect_value(msg_serialization_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_serialization_func, strlen(serialized_msg_buf));
 
-	// Expect the message to be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &test_msg);
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
 
-	// Do one iteration of the sender thread.
-	init_data[1].action(init_data[1].action_params);
+	tx_worker->action(tx_worker->action_params);
 
-	// See what was written to the tx buffer.
-	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
+	char check_buf[200];
+	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
 
-	assert_string_equal("$123,SERIALIZED_MESSAGE*1A\r\n", buf);
-
-	// The next iteration should not do anything.
-	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
-	init_data[1].action(init_data[1].action_params);
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
-
-
-	// Try various failure modes
-	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
-	expect_any(msg_serialize_message, output_buf);
-	expect_any(msg_serialize_message, output_buf_len);
-	msg_stubs_set_serialization_output(NULL);
-	will_return(msg_serialize_message, -1);
-	errno = MESSAGE_FORMATTING_ERROR;
-
-	// Add the message to the outgoing queue.
-	dispatcher_send_message(&test_msg);
-
-	// Expect the message to be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &test_msg);
-
-	// Do an iteration. This should fail and should add an error message to
-	// the error queue.
-	init_data[1].action(init_data[1].action_params);
-
-	// Check that nothing was written to the tx_buffer.
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
-
-	// Do an iteration. This should send the error message from the last
-	// iteration.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	// Check that a MESSAGE_FORMATTING_ERROR was sent.
-	assert_string_equal("$ERROR,-9*60\r\n", buf);
-
-	// Check that the tx_buffer is now empty.
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
+	assert_string_equal(check_buf, "$1235,FAKE,SER_DES_MESSAGE,PAYLOAD*33\r\n");
 
 
 
-	// Try a situation where there's not enough room for the checksum.
-	char long_buf[BSP_MAX_MESSAGE_LENGTH - 6];
-	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH - 6);
+	// Try TX buffer full situation
+	while (os_char_buffer_write_ch(&bsp_tx_buffer, 'a'));
 
-	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
-	expect_any(msg_serialize_message, output_buf);
-	expect_any(msg_serialize_message, output_buf_len);
-	msg_stubs_set_serialization_output(long_buf);
-	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 6);
-	long_buf[BSP_MAX_MESSAGE_LENGTH - 7] = '\0';
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
 
-	errno = MESSAGE_FORMATTING_ERROR;
+	expect_value(msg_serialization_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_serialization_func, strlen(serialized_msg_buf));
 
-	// Add the message to the outgoing queue.
-	dispatcher_send_message(&test_msg);
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
 
-	// Expect the message to be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &test_msg);
+	tx_worker->action(tx_worker->action_params);
 
-	// Do an iteration. This should fail and should add an error message to
-	// the error queue.
-	init_data[1].action(init_data[1].action_params);
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
-
-	// Do an iteration. This should send the error message from the last
-	// iteration.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	// Check that a MESSAGE_FORMATTING_ERROR was sent.
-	assert_string_equal("$ERROR,-4*6D\r\n", buf);
-
-
-	// Try a situation where there's not enough room for the checksum.
-	memset(long_buf, 'A', BSP_MAX_MESSAGE_LENGTH - 6);
-
-	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
-	expect_any(msg_serialize_message, output_buf);
-	expect_any(msg_serialize_message, output_buf_len);
-	msg_stubs_set_serialization_output(long_buf);
-	will_return(msg_serialize_message, BSP_MAX_MESSAGE_LENGTH - 6);
-	long_buf[BSP_MAX_MESSAGE_LENGTH - 7] = '\0';
-	errno = MESSAGE_FORMATTING_ERROR;
-
-	// Add the message to the outgoing queue.
-	dispatcher_send_message(&test_msg);
-
-	// Expect the message to be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &test_msg);
-
-	// Do an iteration. This should fail and should add an error message to
-	// the error queue.
-	init_data[1].action(init_data[1].action_params);
-	assert_int_equal(os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf)), 0);
-
-	// Do an iteration. This should send the error message from the last
-	// iteration.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	// Check that a MESSAGE_FORMATTING_ERROR was sent.
-	assert_string_equal("$ERROR,-4*6D\r\n", buf);
-
-
-	// Try to send a message when the TX buffer is full
-	while (os_char_buffer_write_ch(&bsp_tx_buffer, 'X'));
-
-	expect_value(msg_serialize_message, msg, (uintptr_t) &test_msg);
-	expect_any(msg_serialize_message, output_buf);
-	expect_any(msg_serialize_message, output_buf_len);
-	msg_stubs_set_serialization_output(serialized_msg);
-	will_return(msg_serialize_message, sizeof(serialized_msg) - 1);
-
-	// Add the message to the outgoing queue.
-	dispatcher_send_message(&test_msg);
-
-	// Expect the message to be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &test_msg);
-
-	// Do one iteration of the sender thread.
-	init_data[1].action(init_data[1].action_params);
-
-	// Empty the full TX buffer
 	char ch = '\0';
-	while (os_char_buffer_read_ch(&bsp_tx_buffer, &ch)) {
-		assert_int_equal(ch, 'X');
-	}
+	while (os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
 
-	// Do another iteration of the sender thread. This should output an
-	// error message about the full TX buffer in the previous iteration.
-	init_data[1].action(init_data[1].action_params);
+	tx_worker->action(tx_worker->action_params);
 
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
 
-	assert_string_equal("$ERROR,-7*6E\r\n", buf);
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-9*4B\r\n");
 
 
+
+	// Test serialization failed scenario
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
+
+	expect_value(msg_serialization_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_serialization_func, -1);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	tx_worker->action(tx_worker->action_params);
+
+	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-3*41\r\n");
+
+
+
+	// Test message too long scenario
+	memset(serialized_msg_buf, 'a', sizeof(serialized_msg_buf));
+
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
+
+	expect_value(msg_serialization_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_serialization_func, sizeof(serialized_msg_buf));
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	tx_worker->action(tx_worker->action_params);
+
+	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-11*72\r\n");
+
+
+
+	// Test scenario with missing message serialization function
+	msg_p->type = FAKE_DES_ONLY_MESSAGE;
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	tx_worker->action(tx_worker->action_params);
+
+	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-8*4A\r\n");
 }
 
 static void recv_msg_test(void **state)
 {
-	init_test(state);
+	(void) state;
 
-	struct worker_init_data *init_data = NULL;
-	assert_int_equal(worker_stubs_get_workers(&init_data), 2);
-
-	// Check we have the correct worker task
-	assert_string_equal(init_data[0].name, "rx_worker");
+	struct worker_init_data *rx_worker = get_rx_worker();
+	struct worker_init_data *tx_worker = get_tx_worker();
 
 
-	// Check that nothing happens if there is no data in the rx_buffer.
+	// No chars
+	expect_any(os_task_sleep, num_ticks);
+	rx_worker->action(rx_worker->action_params);
+
+
+	// Bad checksum situation
 	char ch = '\0';
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
+	expect_any(os_task_sleep, num_ticks);
+	tx_worker->action(tx_worker->action_params);
 	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
 
-	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
+	char bad_csum_str[] = "124auoe$456,FAKE,SER_DES_MESSAGE,PAYLOAD*1D\r\n";
+	os_char_buffer_write_str(&bsp_rx_buffer, bad_csum_str);
 
-	init_data[0].action(init_data[0].action_params);
-
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-	// Check that messages without a $ aren't being parsed
-	char no_dollar_str[] = "SET_SPIN_STATE,1,ON*21\r\n";
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, no_dollar_str),
-	                 sizeof(no_dollar_str) - 1);
-
-	for (uint8_t i = 0; i < sizeof(no_dollar_str) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
+	for (uint32_t i = 0; i < sizeof(bad_csum_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
 	}
 
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+	tx_worker->action(tx_worker->action_params);
+
+	char check_buf[200];
+	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-1*43\r\n");
 
 
-	// Try parsing a correctly formatted message
-	char set_state_str[] = "$SET_SPIN_STATE,1,ON*21\r\n";
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, set_state_str),
-	                 sizeof(set_state_str) - 1);
+	char bad_csum_str2[] = "$456,FAKE,SER_DES_MESSAGE,PAYLOADX1D\r\n";
+	os_char_buffer_write_str(&bsp_rx_buffer, bad_csum_str2);
 
-	struct spin_state_set_data set_state_msg_data = {
-		.channel_num = 1,
-		.state = SPIN_RUNNING
-	};
-
-	struct message set_state_msg = {
-		.type = MSG_SET_SPIN_STATE,
-		.data = &set_state_msg_data
-	};
-
-	expect_any(msg_parse_message, input_buf);
-	will_return(msg_parse_message, &set_state_msg);
-
-	for (uint8_t i = 0; i < sizeof(set_state_str) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
+	for (uint32_t i = 0; i < sizeof(bad_csum_str2) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
 	}
 
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
+	tx_worker->action(tx_worker->action_params);
 
-	expect_value(os_task_sleep, num_ticks, COMM_TASK_SLEEP_TIME_TICKS);
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
 
-	// Do an iteration of the sender thread and make sure no message was
-	// output.
-	init_data[1].action(init_data[1].action_params);
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-
-	// Try receiving a message with a bad checksum.
-	char set_state_bad_csum_str[] = "$SET_SPIN_STATE,1,ON*20\r\n";
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, set_state_bad_csum_str),
-	                 sizeof(set_state_bad_csum_str) - 1);
-
-	for (uint8_t i = 0; i < sizeof(set_state_bad_csum_str) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
-	}
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-	// Do an iteration of the sender thread and check that it output an err
-	// message.
-	init_data[1].action(init_data[1].action_params);
-
-	char buf[200];
-	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	assert_string_equal("$ERROR,-6*6F\r\n", buf);
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-1*43\r\n");
 
 
-	// Try receiving a message with a malformed checksum.
-	char set_state_bad_csum_str2[] = "$SET_SPIN_STATE,1,ON/21\r\n";
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, set_state_bad_csum_str2),
-	                 sizeof(set_state_bad_csum_str2) - 1);
+	// Message too long situation
+	os_char_buffer_write_ch(&bsp_rx_buffer, '$');
+	rx_worker->action(rx_worker->action_params);
 
-	for (uint8_t i = 0; i < sizeof(set_state_bad_csum_str2) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
-	}
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-	// Do an iteration of the sender thread and check that it output an err
-	// message.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	assert_string_equal("$ERROR,-6*6F\r\n", buf);
-
-
-	// Try receiving an unknown message.
-	char unknown_msg_str[] = "$UNKNOWN_MESSAGE,1234*74\r\n";
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, unknown_msg_str),
-	                 sizeof(unknown_msg_str) - 1);
-
-	expect_any(msg_parse_message, input_buf);
-	will_return(msg_parse_message, NULL);
-	errno = UNKNOWN_MESSAGE_TYPE_ERROR;
-
-	for (uint8_t i = 0; i < sizeof(unknown_msg_str) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
-	}
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-
-	// Do an iteration of the sender thread and check that it output an err
-	// message.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	assert_string_equal("$ERROR,-5*6C\r\n", buf);
-
-
-	// Try sending a message we know how to parse, but don't know where to
-	// route to.
-	char unroutable_msg_str[] = "$SPIN_STATE_REPLY,1,RUNNING,1234,-0.123*70\r\n";
-
-	assert_int_equal(os_char_buffer_write_str(&bsp_rx_buffer, unroutable_msg_str),
-	                 sizeof(unroutable_msg_str) - 1);
-
-	struct spin_state_data ss_data = {
-		.channel_num = 1,
-		.state = SPIN_RUNNING,
-		.plan_time_elapsed_msecs = 1234,
-		.output_val_pct = -0.123f
-	};
-
-	struct message unroutable_msg = {
-		.type = MSG_SPIN_STATE_REPLY,
-		.data = &ss_data
-	};
-
-	expect_any(msg_parse_message, input_buf);
-	will_return(msg_parse_message, &unroutable_msg);
-	errno = NO_ERROR;
-
-	// Check that the message will be freed.
-	expect_value(msg_free_message, msg, (uintptr_t) &unroutable_msg);
-
-	for (uint8_t i = 0; i < sizeof(unroutable_msg_str) - 1; i++) {
-		init_data[0].action(init_data[0].action_params);
-	}
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-
-	// Do an iteration of the sender thread and check that it output an err
-	// message.
-	init_data[1].action(init_data[1].action_params);
-
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
-
-	assert_string_equal("$ERROR,-10*58\r\n", buf);
-
-
-	// Try receiving a message that is too long.
-
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
-
-	// The message has to start with a $
-	assert_true(os_char_buffer_write_ch(&bsp_rx_buffer, '$'));
-	init_data[0].action(init_data[0].action_params);
-
-	// BSP_MAX_MESSAGE_LENGTH is larger than the char buffer size, so we
-	// need to immediately read the chars into the message buffer.
-	for (uint32_t i = 1; i <= BSP_MAX_MESSAGE_LENGTH; i++) {
-		assert_true(os_char_buffer_write_ch(&bsp_rx_buffer, 'X'));
-		init_data[0].action(init_data[0].action_params);
+	for (uint32_t i = 0; i < BSP_MAX_MESSAGE_LENGTH ; i++) {
+		os_char_buffer_write_ch(&bsp_rx_buffer, 'a');
+		rx_worker->action(rx_worker->action_params);
 	}
 
-	assert_false(os_char_buffer_read_ch(&bsp_rx_buffer, &ch));
-	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-11*72\r\n");
 
 
-	init_data[1].action(init_data[1].action_params);
-	len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
 
-	assert_string_equal("$ERROR,-11*59\r\n", buf);
+	// Malformed message error
+	char bad_transaction_id_str[] = "$aoue,FAKE,SER_DES_MESSAGE,PAYLOAD*28\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, bad_transaction_id_str);
+
+	for (uint32_t i = 0; i < sizeof(bad_transaction_id_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-2*40\r\n");
+
+
+	char no_subsystem_field_str[] = "$12345,*1D\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, no_subsystem_field_str);
+
+	for (uint32_t i = 0; i < sizeof(no_subsystem_field_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-2*40\r\n");
+
+
+	char no_message_type_field_str[] = "$12345,FAKE,*38\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, no_message_type_field_str);
+
+	for (uint32_t i = 0; i < sizeof(no_message_type_field_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-2*40\r\n");
+
+
+
+	// Unknown subsystem scenario
+	char unknown_subsystem_str[] = "$12345,NONEXISTENT,MSG*2B\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, unknown_subsystem_str);
+
+	for (uint32_t i = 0; i < sizeof(unknown_subsystem_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-6*44\r\n");
+
+
+
+	// Unknown message type scenario
+	char unknown_msg_type_str[] = "$12345,FAKE,UNKNOWN*70\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, unknown_msg_type_str);
+
+	for (uint32_t i = 0; i < sizeof(unknown_msg_type_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-7*45\r\n");
+
+
+
+	// Missing parsing function scenario
+	char missing_parsing_func_str[] = "$12345,FAKE,SER_ONLY_MESSAGE*23\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, missing_parsing_func_str);
+
+	for (uint32_t i = 0; i < sizeof(missing_parsing_func_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-8*4A\r\n");
+
+
+
+	// Allocation failure scenario
+	char correct_msg_str[] = "$456,FAKE,SER_DES_MESSAGE,PAYLOAD*01\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, correct_msg_str);
+
+	expect_value(fake_alloc, message_type, FAKE_SER_DES_MESSAGE);
+	will_return(fake_alloc, NULL);
+
+	for (uint32_t i = 0; i < sizeof(correct_msg_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-4*46\r\n");
+
+
+
+	// Payload parsing error scenario
+	struct message msg = {0};
+
+	os_char_buffer_write_str(&bsp_rx_buffer, correct_msg_str);
+
+	expect_value(fake_alloc, message_type, FAKE_SER_DES_MESSAGE);
+	will_return(fake_alloc, &msg);
+
+	expect_value(msg_parsing_func, msg_ptr, (uintptr_t) &msg);
+	will_return(msg_parsing_func, false);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) &msg);
+
+	for (uint32_t i = 0; i < sizeof(correct_msg_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-2*40\r\n");
+
+
+
+	// Subsystem RX queue full scenario
+	struct message *msg_p = &msg;
+	while (os_mailbox_write(&incoming_msg_queue, &msg_p));
+
+	os_char_buffer_write_str(&bsp_rx_buffer, correct_msg_str);
+
+	expect_value(fake_alloc, message_type, FAKE_SER_DES_MESSAGE);
+	will_return(fake_alloc, msg_p);
+
+	expect_value(msg_parsing_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_parsing_func, true);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	for (uint32_t i = 0; i < sizeof(correct_msg_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-5*47\r\n");
+
+
+
+	// All OK scenarios
+	while (os_mailbox_read(&incoming_msg_queue, &msg_p));
+
+	os_char_buffer_write_str(&bsp_rx_buffer, correct_msg_str);
+
+	expect_value(fake_alloc, message_type, FAKE_SER_DES_MESSAGE);
+	will_return(fake_alloc, msg_p);
+
+	expect_value(msg_parsing_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_parsing_func, true);
+
+	for (uint32_t i = 0; i < sizeof(correct_msg_str) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	assert_true(os_mailbox_read(&incoming_msg_queue, &msg_p));
+
+	assert_int_equal(msg_p->type, FAKE_SER_DES_MESSAGE);
+	assert_int_equal(msg_p->transaction_id, 456);
+
+
+	char correct_msg_str2[] = "$853,FAKE,DES_ONLY_MESSAGE,FIELD1,FIELD2*39\r\n";
+
+	os_char_buffer_write_str(&bsp_rx_buffer, correct_msg_str2);
+
+	expect_value(fake_alloc, message_type, FAKE_DES_ONLY_MESSAGE);
+	will_return(fake_alloc, msg_p);
+
+	expect_value(msg_parsing_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_parsing_func, true);
+
+	for (uint32_t i = 0; i < sizeof(correct_msg_str2) - 1; i++) {
+		rx_worker->action(rx_worker->action_params);
+	}
+
+	assert_true(os_mailbox_read(&incoming_msg_queue, &msg_p));
+
+	assert_int_equal(msg_p->type, FAKE_DES_ONLY_MESSAGE);
+	assert_int_equal(msg_p->transaction_id, 853);
 }
 
 
 static void err_msg_test(void **state)
 {
-	init_test(state);
+	struct worker_init_data *tx_worker = get_tx_worker();
 
-	struct worker_init_data *init_data = NULL;
-	assert_int_equal(worker_stubs_get_workers(&init_data), 2);
+	int32_t err_code = -12;
+	os_mailbox_write(&outgoing_err_queue, &err_code);
 
-	// Check we have the correct worker task
-	assert_string_equal(init_data[1].name, "tx_worker");
-	assert_ptr_equal(init_data[1].action_params, &bsp_tx_buffer);
+	tx_worker->action(tx_worker->action_params);
+
+	char check_buf[200];
+	ssize_t len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$FAKE,ERROR,-12*7F\r\n");
 
 
-	// Try sending a regular error message
-	dispatcher_send_err(12345);
 
-	init_data[1].action(init_data[1].action_params);
+	err_code = 1203;
+	os_mailbox_write(&outgoing_err_queue, &err_code);
 
-	char buf[200];
-	uint32_t len = os_char_buffer_read_buf(&bsp_tx_buffer, buf, sizeof(buf));
-	buf[len] = '\0';
+	tx_worker->action(tx_worker->action_params);
 
-	assert_string_equal("$ERROR,12345*45\r\n", buf);
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$FAKE,ERROR,1203*51\r\n");
 }
 
 int main(void)

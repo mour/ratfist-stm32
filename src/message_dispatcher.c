@@ -66,7 +66,7 @@ static void process_outgoing_message(mailbox_t *tx_char_buffer,
 static bool schedule_err_message(mailbox_t *err_msg_queue, int32_t err_code);
 
 
-static int32_t disp_err_msg_queue_buf[MAX_OUTBOUND_ERROR_MESSAGES];
+static int32_t disp_err_msg_queue_buf[MAX_DISPATCHER_ERROR_MESSAGES];
 static mailbox_t disp_err_msg_queue;
 
 static uint8_t rx_worker_stack[TASK_STACK_SIZE];
@@ -301,7 +301,7 @@ static void process_outgoing_err_message(mailbox_t *tx_char_buffer,
 {
 	char message_buf[BSP_MAX_MESSAGE_LENGTH];
 	message_buf[0] = '$';
-	uint32_t total_len = 1;
+	uint32_t pos_in_buf = 1;
 
 	int payload_len = snprintf(&message_buf[1], ARRAY_SIZE(message_buf) - 1,
 	                           "%s,ERROR,%ld", subsystem_name, err_code);
@@ -309,29 +309,27 @@ static void process_outgoing_err_message(mailbox_t *tx_char_buffer,
 		return;
 	}
 
-	total_len += (uint32_t) payload_len;
-	if (total_len >= ARRAY_SIZE(message_buf)) {
+	pos_in_buf += (uint32_t) payload_len;
+	if (pos_in_buf >= ARRAY_SIZE(message_buf)) {
 		return;
 	}
 
 	uint8_t csum = calc_checksum(&message_buf[1], (uint32_t) payload_len);
 
-	int csum_len = snprintf(&message_buf[total_len],
-	                        ARRAY_SIZE(message_buf) - total_len,
+	int csum_len = snprintf(&message_buf[pos_in_buf],
+	                        ARRAY_SIZE(message_buf) - pos_in_buf,
 	                        "*%02X\r\n", csum);
 
 	if (csum_len <= 0) {
 		return;
 	}
 
-	total_len += (uint32_t) csum_len;
-	if (total_len >= ARRAY_SIZE(message_buf)) {
+	pos_in_buf += (uint32_t) csum_len;
+	if (pos_in_buf >= ARRAY_SIZE(message_buf)) {
 		return;
 	}
 
-	os_char_buffer_write_buf_blocking(tx_char_buffer,
-	                                  message_buf,
-	                                  total_len);
+	os_char_buffer_write_buf_blocking(tx_char_buffer, message_buf, pos_in_buf);
 }
 
 
@@ -349,35 +347,45 @@ static void process_outgoing_message(mailbox_t *tx_char_buffer,
 
 	char message_buf[BSP_MAX_MESSAGE_LENGTH];
 	message_buf[0] = '$';
-	uint32_t total_len = 1;
+	uint32_t pos_in_buf = 1;
 
-	ssize_t prefix_len = snprintf(&message_buf[1],
-	                               ARRAY_SIZE(message_buf) - 1,
-	                               "%lu,%s,%s",
-	                               msg->transaction_id,
-	                               conf->subsystem_name,
-	                               conf->message_handlers[msg->type].message_name);
+	int prefix_len = snprintf(&message_buf[1],
+	                          ARRAY_SIZE(message_buf) - 1,
+	                          "%lu,%s,%s",
+	                           msg->transaction_id,
+	                           conf->subsystem_name,
+	                           conf->message_handlers[msg->type].message_name);
 
 	if (prefix_len <= 0) {
 		schedule_err_message(err_msg_queue, MESSAGE_FORMATTING_ERROR);
 		goto free_msg;
 	}
 
+	pos_in_buf += (uint32_t) prefix_len;
+	if (pos_in_buf >= ARRAY_SIZE(message_buf)) {
+		schedule_err_message(err_msg_queue, MESSAGE_TOO_LONG_ERROR);
+		goto free_msg;
+	}
+
 	ssize_t payload_len = conf->message_handlers[msg->type].serialization_func(
-					msg, &message_buf[prefix_len + 1],
-					ARRAY_SIZE(message_buf) - (uint32_t) (prefix_len + 1));
+					msg, &message_buf[pos_in_buf],
+					ARRAY_SIZE(message_buf) - pos_in_buf);
 
 	if (payload_len <= 0) {
 		schedule_err_message(err_msg_queue, MESSAGE_FORMATTING_ERROR);
 		goto free_msg;
 	}
 
-	uint8_t csum = calc_checksum(&message_buf[1], (uint32_t) (prefix_len + payload_len));
+	pos_in_buf += (uint32_t) payload_len;
+	if (pos_in_buf >= ARRAY_SIZE(message_buf)) {
+		schedule_err_message(err_msg_queue, MESSAGE_TOO_LONG_ERROR);
+		goto free_msg;
+	}
 
-	total_len += (uint32_t) (prefix_len + payload_len);
+	uint8_t csum = calc_checksum(&message_buf[1], pos_in_buf - 1);
 
-	int csum_len = snprintf(&message_buf[total_len],
-	                        ARRAY_SIZE(message_buf) - total_len,
+	int csum_len = snprintf(&message_buf[pos_in_buf],
+	                        ARRAY_SIZE(message_buf) - pos_in_buf,
 	                        "*%02X\r\n", csum);
 
 	if (csum_len <= 0) {
@@ -385,16 +393,14 @@ static void process_outgoing_message(mailbox_t *tx_char_buffer,
 		goto free_msg;
 	}
 
-	total_len += (uint32_t) csum_len;
-	if (total_len >= ARRAY_SIZE(message_buf)) {
+	pos_in_buf += (uint32_t) csum_len;
+	if (pos_in_buf >= ARRAY_SIZE(message_buf)) {
 		schedule_err_message(err_msg_queue, MESSAGE_TOO_LONG_ERROR);
 		goto free_msg;
 	}
 
 
-	if (os_char_buffer_write_buf(tx_char_buffer,
-	                             message_buf,
-	                             total_len) != total_len) {
+	if (os_char_buffer_write_buf(tx_char_buffer, message_buf, pos_in_buf) != pos_in_buf) {
 		schedule_err_message(err_msg_queue, TX_BUFFER_FULL);
 	}
 
@@ -415,7 +421,7 @@ void dispatcher_init(void)
 	// Outgoing error message queue
 	os_mailbox_init(&disp_err_msg_queue,
 	                disp_err_msg_queue_buf,
-	                MAX_OUTBOUND_ERROR_MESSAGES,
+	                MAX_DISPATCHER_ERROR_MESSAGES,
 	                sizeof(int32_t),
 	                NULL);
 

@@ -106,14 +106,36 @@ check_retval
 
 
 echo
-echo "Building Ratfist - Unit Tests"
-mkdir -p "${script_dir}/../build/ratfist-tests"
+echo "Building Ratfist - Unit Tests - STM32F072 Discovery"
+mkdir -p "${script_dir}/../build/ratfist-tests-stm32f072"
 check_retval
 
-cd "${script_dir}/../build/ratfist-tests"
+cd "${script_dir}/../build/ratfist-tests-stm32f072"
 check_retval
 
-cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" ../../tests
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" "-DBOARD_TYPE=stm32f072discovery" ../../tests
+check_retval
+
+cmake --build .
+check_retval
+
+ctest -V .
+check_retval
+
+cmake --build . --target coverage
+check_retval
+
+
+
+echo
+echo "Building Ratfist - Unit Tests - STM32F411 Discovery"
+mkdir -p "${script_dir}/../build/ratfist-tests-stm32f411"
+check_retval
+
+cd "${script_dir}/../build/ratfist-tests-stm32f411"
+check_retval
+
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" "-DBOARD_TYPE=stm32f411discovery" ../../tests
 check_retval
 
 cmake --build .

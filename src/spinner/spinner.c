@@ -23,7 +23,7 @@
 #include "../worker.h"
 #include "../errors.h"
 #include "../message_dispatcher.h"
-
+#include "../constants.h"
 
 // Rust init function
 void spinner_rust_init(struct subsystem_message_conf *conf);

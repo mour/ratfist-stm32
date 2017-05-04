@@ -25,10 +25,10 @@
 struct fake_data_struct {};
 
 mailbox_t bsp_rx_buffer;
-char rx_buffer_data[200];
+char rx_buffer_data[BSP_MAX_MESSAGE_LENGTH + 10];
 
 mailbox_t bsp_tx_buffer;
-char tx_buffer_data[200];
+char tx_buffer_data[BSP_MAX_MESSAGE_LENGTH + 10];
 
 
 mailbox_t outgoing_msg_queue;
@@ -101,7 +101,7 @@ struct message_handler handlers[] = {
 		.message_name = "NO_SER_DES_MESSAGE",
 		.parsing_func = NULL,
 		.serialization_func = NULL,
-	}
+	},
 };
 
 struct subsystem_message_conf fake_subsystem = {
@@ -332,6 +332,38 @@ static void send_msg_test(void **state)
 
 
 
+	// Test message name too long scenario
+	char long_msg_name[BSP_MAX_MESSAGE_LENGTH];
+	memset(long_msg_name, 'A', sizeof(long_msg_name) - 1);
+	long_msg_name[BSP_MAX_MESSAGE_LENGTH - 1] = '\0';
+
+	// Temporarily switch the message names
+	char *orig_msg_name = handlers[msg_p->type].message_name;
+	handlers[msg_p->type].message_name = long_msg_name;
+
+
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	tx_worker->action(tx_worker->action_params);
+
+	// Switch back to original message name (switch back before asserts so we don't influence other tests)
+	handlers[msg_p->type].message_name = orig_msg_name;
+
+	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-11*72\r\n");
+
+
+
+
 	// Test message too long scenario
 	memset(serialized_msg_buf, 'a', sizeof(serialized_msg_buf));
 
@@ -353,6 +385,29 @@ static void send_msg_test(void **state)
 	check_buf[len] = '\0';
 
 	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-11*72\r\n");
+
+
+
+	// Test message payload really long, but still just enough to fit in the buffer scenario
+	os_mailbox_write(&outgoing_msg_queue, &msg_p);
+
+	expect_value(msg_serialization_func, msg_ptr, (uintptr_t) msg_p);
+	will_return(msg_serialization_func, BSP_MAX_MESSAGE_LENGTH - 30);
+
+	expect_value(fake_free, msg_ptr, (uintptr_t) msg_p);
+
+	tx_worker->action(tx_worker->action_params);
+
+	assert_false(os_char_buffer_read_ch(&bsp_tx_buffer, &ch));
+
+	tx_worker->action(tx_worker->action_params);
+
+	len = os_char_buffer_read_buf(&bsp_tx_buffer, check_buf, sizeof(check_buf));
+	assert_int_not_equal(len, 0);
+	check_buf[len] = '\0';
+
+	assert_string_equal(check_buf, "$DISPATCHER,ERROR,-11*72\r\n");
+
 
 
 

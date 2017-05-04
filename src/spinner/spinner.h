@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #include "../message_dispatcher.h"
-#include "../constants.h"
+#include "constants.h"
 
 /*
  * Message types

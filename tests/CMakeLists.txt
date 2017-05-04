@@ -2,16 +2,19 @@ cmake_minimum_required(VERSION 3.5)
 
 project(ratfist-tests VERSION 0.0.1 LANGUAGES C)
 
-
-
 include(ExternalProject)
+
+
+if(NOT DEFINED BOARD_TYPE)
+    message(FATAL_ERROR "A STM32 board type must be defined. -DBOARD_TYPE=...\nAllowed board types are: stm32f072discovery, stm32f411discovery")
+endif()
 
 get_filename_component(TOOLCHAIN_FILE_ABSPATH "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE)
 
 # Build cmocka
 ExternalProject_Add(cmocka
-    URL https://cmocka.org/files/1.0/cmocka-1.0.1.tar.xz
-    URL_MD5 ed861e501a21a92b2af63e466df2015e
+    URL https://cmocka.org/files/1.1/cmocka-1.1.1.tar.xz
+    URL_MD5 6fbff4e42589566eda558db98b97623e
     CMAKE_ARGS "$<$<BOOL:${CMAKE_TOOLCHAIN_FILE}>:-DCMAKE_TOOLCHAIN_FILE:string=${TOOLCHAIN_FILE_ABSPATH}>"
     CMAKE_ARGS "$<$<BOOL:${CMAKE_INSTALL_PREFIX}>:-DCMAKE_INSTALL_PREFIX:string=${CMAKE_INSTALL_PREFIX}>"
 )
@@ -24,6 +27,10 @@ link_libraries("${CMAKE_BINARY_DIR}/cmocka-prefix/src/cmocka-build/src/libcmocka
 
 # Enable coverage
 link_libraries("--coverage")
+
+# Add board define
+string(TOUPPER "${BOARD_TYPE}" UPPERCASE_BOARD_TYPE)
+add_definitions("-D${UPPERCASE_BOARD_TYPE}")
 
 # Add include stub overrides
 include_directories(

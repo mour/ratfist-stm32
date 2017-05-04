@@ -56,7 +56,7 @@ before_script:
   - cd ../..
 
   - cd build/ratfist-tests
-  - cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../../tests
+  - cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/gcc-linux-x86-toolchain.cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBOARD_TYPE=${BOARD_TYPE} ../../tests
   - cd ../..
 
 
@@ -88,14 +88,14 @@ addons:
       - graphviz
 
 env:
-  # - |
-  #   CHIP_FAMILY=STM32F0
-  #   BOARD_TYPE=stm32f072discovery
-  #   BUILD_TYPE=Debug
-  # - |
-  #   CHIP_FAMILY=STM32F0
-  #   BOARD_TYPE=stm32f072discovery
-  #   BUILD_TYPE=Release
+  - |
+    CHIP_FAMILY=STM32F0
+    BOARD_TYPE=stm32f072discovery
+    BUILD_TYPE=Debug
+  - |
+    CHIP_FAMILY=STM32F0
+    BOARD_TYPE=stm32f072discovery
+    BUILD_TYPE=Release
   - |
     CHIP_FAMILY=STM32F4
     BOARD_TYPE=stm32f411discovery

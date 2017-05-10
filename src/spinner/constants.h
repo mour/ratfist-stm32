@@ -9,9 +9,9 @@
 
 // Board specific overrides
 #if defined(STM32F072DISCOVERY)
-#include "stm32f072-discovery/constants.h"
+#include "stm32f072discovery/constants.h"
 #elif defined(STM32F411DISCOVERY)
-#include "stm32f411-discovery/constants.h"
+#include "stm32f411discovery/constants.h"
 #endif
 
 #endif /* SPINNER_CONSTANTS_H_ */

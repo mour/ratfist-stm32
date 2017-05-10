@@ -20,6 +20,8 @@
 
 #include "spinner.h"
 
+#include "bsp.h"
+
 #include "../worker.h"
 #include "../errors.h"
 #include "../message_dispatcher.h"
@@ -462,6 +464,8 @@ static struct subsystem_message_conf spinner_conf = {
 
 void spinner_init(void)
 {
+	bsp_spinner_init();
+
 	os_pool_alloc_init(&msg_pool,
 	                   msg_pool_mem,
 	                   sizeof(struct message),

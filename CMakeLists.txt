@@ -13,12 +13,10 @@ endif()
 if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f0discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")
-    set(BSP_SRC_FILE "${CMAKE_CURRENT_LIST_DIR}/src/stm32f072-discovery/bsp.c")
     set(XARGO_TARGET "thumbv6m-none-eabi")
 elseif(BOARD_TYPE STREQUAL "stm32f411discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f4discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f411ve.ld")
-    set(BSP_SRC_FILE "${CMAKE_CURRENT_LIST_DIR}/src/stm32f411-discovery/bsp.c")
     set(XARGO_TARGET "thumbv7em-none-eabihf")
 else()
     message(FATAL_ERROR "Unknown BOARD_TYPE: ${BOARD_TYPE}\nAllowed board types are: stm32f072discovery, stm32f411discovery")
@@ -37,17 +35,28 @@ add_custom_target(rust-clean "xargo" "clean"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
 
+
+set(SPINNER_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/spinner.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/spinner.c"
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/constants.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/bsp.h"
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/${BOARD_TYPE}/bsp.c"
+    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/${BOARD_TYPE}/constants.h"
+)
+
+
+
 # Ratfist binary
 add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/main.c"
-    "${BSP_SRC_FILE}"
+    "${CMAKE_CURRENT_LIST_DIR}/src/${BOARD_TYPE}/bsp.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/constants.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
-    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/spinner.h"
-    "${CMAKE_CURRENT_LIST_DIR}/src/spinner/spinner.c"
+    "${SPINNER_SOURCES}"
 )
 
 add_dependencies(${PROJECT_NAME} rust-lib)

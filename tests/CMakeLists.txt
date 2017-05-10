@@ -71,6 +71,7 @@ add_executable(test_spinner
     "${CMAKE_CURRENT_LIST_DIR}/../libsrc/mouros/src/mailbox.c"
     "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/worker.c"
     "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/message_dispatcher.c"
+    "${CMAKE_CURRENT_LIST_DIR}/stubs/ratfist/spinner/bsp.c"
 )
 
 set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/../src/spinner/spinner.c" PROPERTIES COMPILE_FLAGS "--coverage")

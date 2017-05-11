@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.5)
 
-project(ratfist VERSION 0.0.1 LANGUAGES C)
+project(ratfist VERSION 0.2.0 LANGUAGES C)
 
 find_package(Doxygen)
 

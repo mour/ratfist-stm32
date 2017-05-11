@@ -16,7 +16,9 @@ int main(void)
 
 	dispatcher_init();
 
+#ifdef INCLUDE_SPINNER
 	spinner_init();
+#endif
 
 	os_tasks_start(1000);
 

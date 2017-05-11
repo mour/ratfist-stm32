@@ -125,8 +125,6 @@ void bsp_init(void)
 
 	comm_init();
 
-	spinner_init();
-
 	is_initialized = true;
 }
 

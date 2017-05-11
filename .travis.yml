@@ -52,7 +52,7 @@ before_script:
     mkdir build/ratfist-tests
 
   - cd build/ratfist
-  - cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake -DCHIP_FAMILY=${CHIP_FAMILY} -DBOARD_TYPE=${BOARD_TYPE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_FULL_NEWLIB=ON ../..
+  - cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake -DCHIP_FAMILY=${CHIP_FAMILY} -DBOARD_TYPE=${BOARD_TYPE} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_FULL_NEWLIB=ON -DINCLUDE_SPINNER=${INCLUDE_SPINNER} ../..
   - cd ../..
 
   - cd build/ratfist-tests
@@ -92,15 +92,19 @@ env:
     CHIP_FAMILY=STM32F0
     BOARD_TYPE=stm32f072discovery
     BUILD_TYPE=Debug
+    INCLUDE_SPINNER=1
   - |
     CHIP_FAMILY=STM32F0
     BOARD_TYPE=stm32f072discovery
     BUILD_TYPE=Release
+    INCLUDE_SPINNER=1
   - |
     CHIP_FAMILY=STM32F4
     BOARD_TYPE=stm32f411discovery
     BUILD_TYPE=Debug
+    INCLUDE_SPINNER=1
   - |
     CHIP_FAMILY=STM32F4
     BOARD_TYPE=stm32f411discovery
     BUILD_TYPE=Release
+    INCLUDE_SPINNER=1

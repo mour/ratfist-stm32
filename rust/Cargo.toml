@@ -15,6 +15,10 @@ panic = "abort"
 panic = "abort"
 
 
+[features]
+spinner = []
+
+
 [dependencies]
 
 [dependencies.mouros-rust-bindings]

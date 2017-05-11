@@ -28,7 +28,12 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libsrc/mouros")
 
 
 # Rust part of ratfist
-add_custom_target(rust-lib "xargo" "build" "--lib" "--target" "${XARGO_TARGET}" "$<$<CONFIG:Release>:--release>"
+add_custom_target(rust-lib
+                  "xargo" "build" "--lib"
+                  "--target" "${XARGO_TARGET}"
+                  "$<$<CONFIG:Release>:--release>"
+                  "$<$<OR:${INCLUDE_SPINNER}>:--features>"
+                  "$<$<BOOL:${INCLUDE_SPINNER}>:spinner>"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
 add_custom_target(rust-clean "xargo" "clean"
@@ -45,8 +50,6 @@ set(SPINNER_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/src/spinner/${BOARD_TYPE}/constants.h"
 )
 
-
-
 # Ratfist binary
 add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/main.c"
@@ -56,7 +59,8 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/message_dispatcher.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.h"
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
-    "${SPINNER_SOURCES}"
+
+    "$<$<BOOL:${INCLUDE_SPINNER}>:${SPINNER_SOURCES}>"
 )
 
 add_dependencies(${PROJECT_NAME} rust-lib)
@@ -77,7 +81,12 @@ target_compile_options(${PROJECT_NAME}
             "-Wfloat-equal"
             "$<$<CONFIG:Debug>:-g3>")
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC "$<UPPER_CASE:${BOARD_TYPE}>")
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC
+    "$<UPPER_CASE:${BOARD_TYPE}>"
+    "$<$<BOOL:${INCLUDE_SPINNER}>:INCLUDE_SPINNER>"
+)
+
 
 target_link_libraries(${PROJECT_NAME} m)
 target_link_libraries(${PROJECT_NAME} mouros)

@@ -4,7 +4,11 @@
 
 mod bindings;
 
+#[cfg(feature = "spinner")]
 pub mod spinner;
+
+#[cfg(feature = "meteo")]
+pub mod meteo;
 
 #[macro_use]
 extern crate mouros_rust_bindings;

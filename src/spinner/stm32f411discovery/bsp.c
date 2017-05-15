@@ -1,5 +1,4 @@
 /**
- /**
  * @file
  *
  * This file contains the implementation of the Spinner specific BSP functions for STM32F411 Discovery.

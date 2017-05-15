@@ -152,11 +152,11 @@ void bsp_led_toggle(enum board_led led)
  */
 void usart1_isr(void)
 {
-	if (usart_get_interrupt_source(USART1, USART_ISR_RXNE)) {
+	if (usart_get_flag(USART1, USART_ISR_RXNE)) {
 		char ch = (char) usart_recv(USART1);
 		os_char_buffer_write_ch(&bsp_rx_buffer, ch);
 
-	} else if (usart_get_interrupt_source(USART1, USART_ISR_TXE)) {
+	} else if (usart_get_flag(USART1, USART_ISR_TXE)) {
 		char ch = '\0';
 		if (os_char_buffer_read_ch(&bsp_tx_buffer, &ch)) {
 			usart_send(USART1, (uint8_t) ch);
@@ -164,7 +164,7 @@ void usart1_isr(void)
 			usart_disable_tx_interrupt(USART1);
 		}
 
-	} else if (USART_ISR(USART1) & USART_ISR_ORE) {
+	} else if (usart_get_flag(USART1, USART_ISR_ORE)) {
 		USART_ICR(USART1) |= USART_ICR_ORECF;
 	}
 }

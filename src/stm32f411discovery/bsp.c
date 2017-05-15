@@ -112,8 +112,8 @@ void bsp_init(void)
 		.ppre1 = RCC_CFGR_PPRE_DIV_2,
 		.ppre2 = RCC_CFGR_PPRE_DIV_NONE,
 		.power_save = 0,
-		.flash_config = FLASH_ACR_LATENCY_3WS | FLASH_ACR_ICE |
-		                FLASH_ACR_DCE | FLASH_ACR_PRFTEN,
+		.flash_config = FLASH_ACR_LATENCY_3WS | FLASH_ACR_ICEN |
+		                FLASH_ACR_DCEN | FLASH_ACR_PRFTEN,
 		.ahb_frequency = 96000000,
 		.apb1_frequency = 48000000,
 		.apb2_frequency = 96000000
@@ -170,12 +170,12 @@ void bsp_led_toggle(enum board_led led)
  */
 void usart2_isr(void)
 {
-	if (usart_get_interrupt_source(USART2, USART_SR_RXNE) ||
-	    usart_get_interrupt_source(USART2, USART_SR_ORE)) {
+	if (usart_get_flag(USART2, USART_SR_RXNE) ||
+	    usart_get_flag(USART2, USART_SR_ORE)) {
 		char ch = (char) usart_recv(USART2);
 		os_char_buffer_write_ch(&bsp_rx_buffer, ch);
 
-	} else if (usart_get_interrupt_source(USART2, USART_SR_TXE)) {
+	} else if (usart_get_flag(USART2, USART_SR_TXE)) {
 		char ch = '\0';
 		if (os_char_buffer_read_ch(&bsp_tx_buffer, &ch)) {
 			usart_send(USART2, (uint8_t) ch);

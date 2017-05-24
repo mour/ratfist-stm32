@@ -10,6 +10,13 @@ if(NOT DEFINED BOARD_TYPE)
 endif()
 
 
+if(DEFINED INCLUDE_SPINNER)
+    set(INCLUDE_SPINNER ${INCLUDE_SPINNER} CACHE BOOL "Enable Spinner")
+else()
+    set(INCLUDE_SPINNER 0 CACHE BOOL "Enable Spinner")
+endif()
+
+
 if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f0discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")

@@ -27,7 +27,7 @@ check_retval
 cd "${script_dir}/../build/ratfist-stm32f0-debug"
 check_retval
 
-cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f072discovery" "-DCHIP_FAMILY=STM32F0" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" ../..
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f072discovery" "-DCHIP_FAMILY=STM32F0" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" "-DINCLUDE_SPINNER=1" ../..
 check_retval
 
 cmake --build .
@@ -49,7 +49,7 @@ check_retval
 cd "${script_dir}/../build/ratfist-stm32f0-release"
 check_retval
 
-cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f072discovery" "-DCHIP_FAMILY=STM32F0" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Release" ../..
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f072discovery" "-DCHIP_FAMILY=STM32F0" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Release" "-DINCLUDE_SPINNER=1" ../..
 check_retval
 
 cmake --build .
@@ -70,7 +70,7 @@ check_retval
 cd "${script_dir}/../build/ratfist-stm32f4-debug"
 check_retval
 
-cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f411discovery" "-DCHIP_FAMILY=STM32F4" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" ../..
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f411discovery" "-DCHIP_FAMILY=STM32F4" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Debug" "-DINCLUDE_SPINNER=1" ../..
 check_retval
 
 cmake --build .
@@ -91,7 +91,7 @@ check_retval
 cd "${script_dir}/../build/ratfist-stm32f4-release"
 check_retval
 
-cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f411discovery" "-DCHIP_FAMILY=STM32F4" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Release" ../..
+cmake "-DCMAKE_INSTALL_PREFIX=../install" "-DBOARD_TYPE=stm32f411discovery" "-DCHIP_FAMILY=STM32F4" "-DCMAKE_TOOLCHAIN_FILE=../../libsrc/mouros/cmake/arm-none-eabi-toolchain.cmake" "-DCMAKE_BUILD_TYPE=Release" "-DINCLUDE_SPINNER=1" ../..
 check_retval
 
 cmake --build .

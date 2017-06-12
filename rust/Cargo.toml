@@ -17,9 +17,12 @@ panic = "abort"
 
 [features]
 spinner = []
+meteo = []
 
 
 [dependencies]
+cortex-m = "0.2.7"
+volatile-register = "0.2.0"
 
 [dependencies.mouros-rust-bindings]
 path = "../libsrc/mouros/rust"

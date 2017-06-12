@@ -2,10 +2,14 @@
 #![feature(lang_items)]
 #![no_std]
 
+
 mod bindings;
 
 #[cfg(feature = "spinner")]
 pub mod spinner;
+
+#[cfg(feature = "meteo")]
+pub mod i2c;
 
 #[cfg(feature = "meteo")]
 pub mod meteo;
@@ -13,6 +17,8 @@ pub mod meteo;
 #[macro_use]
 extern crate mouros_rust_bindings;
 
+extern crate cortex_m;
+extern crate volatile_register;
 
 #[lang = "panic_fmt"]
 #[no_mangle]

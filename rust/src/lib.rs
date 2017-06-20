@@ -3,6 +3,33 @@
 #![no_std]
 
 
+// TODO Replace with 'matches' once that stops depending on std.
+#[macro_export]
+macro_rules! matches {
+    ($expression:expr, $($pattern:tt)+) => {
+        __as_expr! {
+            match $expression {
+                $($pattern)+ => true,
+                _ => false
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __as_expr {
+    ($value:expr) => ($value)
+}
+
+
+#[macro_use]
+extern crate mouros_rust_bindings;
+
+extern crate volatile_register;
+
+mod bsp;
+
 mod bindings;
 
 #[cfg(feature = "spinner")]
@@ -13,12 +40,6 @@ pub mod i2c;
 
 #[cfg(feature = "meteo")]
 pub mod meteo;
-
-#[macro_use]
-extern crate mouros_rust_bindings;
-
-extern crate cortex_m;
-extern crate volatile_register;
 
 #[lang = "panic_fmt"]
 #[no_mangle]

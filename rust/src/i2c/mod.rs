@@ -3,6 +3,8 @@ use core::mem;
 
 pub mod i2c_v1;
 
+use bsp;
+
 #[derive(PartialEq)]
 enum PeripheralState {
     StartBitSet,
@@ -44,31 +46,59 @@ impl<'a> Step<'a> {
 }
 
 
-
-
 struct Transaction<'a, 'b: 'a> {
     steps: &'a mut [Step<'b>],
     curr_step: usize,
     device_addr: u8
 }
 
-pub fn start_transaction<'a>(device_addr: u8, steps: &mut [Step<'a>]) -> bool {
-    if unsafe { it_context.current_transaction.is_some() || it_context.state != PeripheralState::Done(0)} {
-        return false;
+impl<'a, 'b> Transaction<'a, 'b> {
+    fn on_last_step(&self) -> bool {
+        self.curr_step >= self.steps.len()
     }
-    
+}
+
+pub enum Peripheral {
+    I2C1
+}
+
+impl Into<usize> for Peripheral {
+    fn into(self) -> usize {
+        match self {
+            Peripheral::I2C1 => bsp::i2c::I2C1
+        }
+    }
+}
+
+pub fn run_transaction<'a>(device_addr: u8, steps: &mut [Step<'a>]) -> bool {
     unsafe {
-        it_context.current_transaction = Some(Transaction {
-            steps: mem::transmute(steps),
-            curr_step: 0,
-            device_addr: device_addr
+        critical!({
+            if IT_CONTEXT.current_transaction.is_some() || matches!(IT_CONTEXT.state, PeripheralState::Done(_)) {
+                return false;
+            }
+
+            let periph = i2c_v1::I2C::get_periph(IT_CONTEXT.periph_addr);
+            periph.reset();
+
+            IT_CONTEXT.current_transaction = Some(Transaction {
+                steps: mem::transmute::<&mut [Step], &mut [Step]>(steps),
+                curr_step: 0,
+                device_addr: device_addr
+            });
         });
-        
-        it_context.current_transaction = None;
+
+        loop {
+            critical!({
+                match IT_CONTEXT.state {
+                    PeripheralState::Done(ret_val) => {
+                        IT_CONTEXT.current_transaction = None;
+                        return ret_val == 0;
+                    },
+                    _ => {}
+                }
+            });
+        }
     }
-    
-   
-    true
 }
 
 
@@ -79,8 +109,8 @@ pub struct InterruptContext<'a, 'b: 'a> {
 }
 
 
-static mut it_context: InterruptContext = InterruptContext {
+static mut IT_CONTEXT: InterruptContext = InterruptContext {
     current_transaction: None,
-    periph_addr: 0,
+    periph_addr: bsp::i2c::I2C1,
     state: PeripheralState::Done(0)
 };

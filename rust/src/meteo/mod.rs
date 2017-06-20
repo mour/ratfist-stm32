@@ -11,5 +11,5 @@ pub extern "C" fn meteo_comm_loop(_params: *mut CVoid) {
     
     let mut steps = [i2c::Step::Write(&mut write1), i2c::Step::Read(&mut read2)];
     
-    i2c::start_transaction(0xaa, &mut steps);
+    i2c::run_transaction(0xaa, &mut steps);
 }

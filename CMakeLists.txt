@@ -16,6 +16,12 @@ else()
     set(INCLUDE_SPINNER 0 CACHE BOOL "Enable Spinner")
 endif()
 
+if(DEFINED INCLUDE_METEO)
+    set(INCLUDE_METEO ${INCLUDE_METEO} CACHE BOOL "Enable Meteo")
+else()
+    set(INCLUDE_METEO 0 CACHE BOOL "Enable Meteo")
+endif()
+
 
 if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f0discovery.cfg")
@@ -39,8 +45,8 @@ add_custom_target(rust-lib
                   "xargo" "build" "--lib"
                   "--target" "${XARGO_TARGET}"
                   "$<$<CONFIG:Release>:--release>"
-                  "$<$<OR:${INCLUDE_SPINNER}>:--features>"
-                  "$<$<BOOL:${INCLUDE_SPINNER}>:spinner>"
+                  "--features"
+                  "${BOARD_TYPE}$<$<BOOL:${INCLUDE_SPINNER}>:,spinner>$<$<BOOL:${INCLUDE_METEO}>:,meteo>"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
 add_custom_target(rust-clean "xargo" "clean"
@@ -57,6 +63,10 @@ set(SPINNER_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/src/spinner/${BOARD_TYPE}/constants.h"
 )
 
+set(METEO_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/src/meteo/${BOARD_TYPE}/bsp.c"
+)
+
 # Ratfist binary
 add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/main.c"
@@ -68,6 +78,7 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_LIST_DIR}/src/worker.c"
 
     "$<$<BOOL:${INCLUDE_SPINNER}>:${SPINNER_SOURCES}>"
+    "$<$<BOOL:${INCLUDE_METEO}>:${METEO_SOURCES}>"
 )
 
 add_dependencies(${PROJECT_NAME} rust-lib)

@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use bsp;
+
 const I2C_CR1_SWRST: u32 = 1 << 15;
 const I2C_CR1_ALERT: u32 = 1 << 13;
 const I2C_CR1_PEC: u32 = 1 << 12;
@@ -204,8 +206,7 @@ impl I2C {
 }
 
 #[no_mangle]
-pub extern "C" fn interrupt_handler(it_context: *mut InterruptContext) {
-    let ctx: &mut InterruptContext = unsafe { &mut *it_context };
+pub extern "C" fn rust_i2c_interrupt_handler(ctx: &mut InterruptContext) {
 
     // Handle interrupts
     // SB - start bit sent - cleared automatically by reading SR1 & writing to DR
@@ -343,3 +344,15 @@ pub extern "C" fn interrupt_handler(it_context: *mut InterruptContext) {
         periph.reset();
     }
 }
+
+
+pub static mut I2C_PERIPHS: [InterruptContext; 1] = [
+    InterruptContext {
+        current_transaction: None,
+        periph_addr: bsp::i2c_periph_addr::I2C1,
+        state: PeripheralState::Done(0),
+    },
+];
+
+
+

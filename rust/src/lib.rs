@@ -28,15 +28,12 @@ extern crate mouros_rust_bindings;
 
 extern crate volatile_register;
 
-mod bsp;
+pub mod bsp;
 
 mod bindings;
 
 #[cfg(feature = "spinner")]
 pub mod spinner;
-
-#[cfg(feature = "meteo")]
-pub mod i2c;
 
 #[cfg(feature = "meteo")]
 pub mod meteo;

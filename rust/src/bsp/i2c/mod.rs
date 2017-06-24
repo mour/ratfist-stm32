@@ -1,9 +1,13 @@
 
+
+#[cfg(feature = "stm32f411discovery")]
+mod i2c_v1;
+#[cfg(feature = "stm32f411discovery")]
+use self::i2c_v1 as i2c_impl;
+
+pub use self::i2c_impl::rust_i2c_interrupt_handler;
+
 use core::mem;
-
-pub mod i2c_v1;
-
-use bsp;
 
 #[derive(PartialEq)]
 enum PeripheralState {
@@ -73,7 +77,7 @@ impl<'a, 'b> I2C<'a, 'b> {
         I2C {
             it_context: unsafe {
                 mem::transmute::<&mut InterruptContext, &mut InterruptContext>(
-                    &mut I2C_PERIPHS[periph as usize],
+                    &mut i2c_impl::I2C_PERIPHS[periph as usize],
                 )
             },
         }
@@ -88,7 +92,7 @@ impl<'a, 'b> I2C<'a, 'b> {
                     return Err(());
                 }
 
-                let periph = i2c_v1::I2C::get_periph(self.it_context.periph_addr);
+                let periph = i2c_impl::I2C::get_periph(self.it_context.periph_addr);
                 periph.reset();
 
                 self.it_context.current_transaction = Some(Transaction {
@@ -124,10 +128,5 @@ pub struct InterruptContext<'a, 'b: 'a> {
     state: PeripheralState,
 }
 
-static mut I2C_PERIPHS: [InterruptContext; 1] = [
-    InterruptContext {
-        current_transaction: None,
-        periph_addr: bsp::i2c::I2C1,
-        state: PeripheralState::Done(0),
-    },
-];
+
+

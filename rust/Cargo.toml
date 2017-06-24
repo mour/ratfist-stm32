@@ -19,6 +19,7 @@ panic = "abort"
 spinner = []
 meteo = []
 stm32f411discovery = []
+stm32f072discovery = []
 
 
 [dependencies]

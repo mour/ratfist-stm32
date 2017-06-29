@@ -11,6 +11,120 @@ pub mod periph_base_addr {
     pub const GPIOE: usize = 0x40021000;
     pub const GPIOH: usize = 0x40021C00;
     pub const RCC: usize = 0x40023800;
+    pub const NVIC: usize = 0xE000E100;
+}
+
+pub mod nvic_impl {
+    use volatile_register::{RW, RO, WO};
+
+    struct Nvic {
+        iser: [RW<u32>; 3],
+        _padding1: [u8; 0x74],
+        icer: [RW<u32>; 3],
+        _padding2: [u8; 0x74],
+        _ispr: [RW<u32>; 3],
+        _padding3: [u8; 0x74],
+        _icpr: [RW<u32>; 3],
+        _padding4: [u8; 0x74],
+        _iabr: [RO<u32>; 3],
+        _padding5: [u8; 0xf4],
+        ipr: [RW<u8>; 21],
+        _padding6: [u8; 0xaac],
+        _stir: WO<u32>,
+    }
+
+    #[allow(non_camel_case_types)]
+    #[repr(u32)]
+    #[derive(Clone, Copy)]
+    pub enum Interrupt {
+        Wwdg = 0,
+        Exti16Pvd = 1,
+        Exti21TampStamp = 2,
+        Exti22RtcWkup = 3,
+        Flash = 4,
+        Rcc = 5,
+        Exti0 = 6,
+        Exti1 = 7,
+        Exti2 = 8,
+        Exti3 = 9,
+        Exti4 = 10,
+        Dma1Stream0 = 11,
+        Dma1Stream1 = 12,
+        Dma1Stream2 = 13,
+        Dma1Stream3 = 14,
+        Dma1Stream4 = 15,
+        Dma1Stream5 = 16,
+        Dma1Stream6 = 17,
+        Adc = 18,
+        Exti9_5 = 23,
+        Tim1BrkTim9 = 24,
+        Tim1UpTim10 = 25,
+        Tim1TrgComTim11 = 26,
+        Tim1Cc = 27,
+        Tim2 = 28,
+        Tim3 = 29,
+        Tim4 = 30,
+        I2C1Ev = 31,
+        I2C1Er = 32,
+        I2C2Ev = 33,
+        I2C2Er = 34,
+        Spi1 = 35,
+        Spi2 = 36,
+        Usart1 = 37,
+        Usart2 = 38,
+        Exti15_10 = 40,
+        Exti17RtcAlarm = 41,
+        Exti18OtgFsWkup = 42,
+        Dma1Stream7 = 47,
+        Sdio = 49,
+        Tim5 = 50,
+        Spi3 = 51,
+        Dma2Stream0 = 56,
+        Dma2Stream1 = 57,
+        Dma2Stream2 = 58,
+        Dma2Stream3 = 59,
+        Dma2Stream4 = 60,
+        OtgFs = 67,
+        Dma2Stream5 = 68,
+        Dma2Stream6 = 69,
+        Dma2Stream7 = 70,
+        Usart6 = 71,
+        I2C3Ev = 72,
+        I2C3Er = 73,
+        Fpu = 81,
+        Spi4 = 84,
+        Spi5 = 85,
+    }
+
+    pub fn enable_interrupt(int: Interrupt) {
+        let nvic = unsafe { &*(super::periph_base_addr::NVIC as *const Nvic) };
+
+        let reg_no = (int as usize) / 32;
+        let offset = (int as usize) % 32;
+
+        unsafe {
+            nvic.iser[reg_no].write(1 << offset);
+        }
+    }
+
+    pub fn disable_interrupt(int: Interrupt) {
+        let nvic = unsafe { &*(super::periph_base_addr::NVIC as *const Nvic) };
+
+        let reg_no = (int as usize) / 32;
+        let offset = (int as usize) % 32;
+
+        unsafe {
+            nvic.icer[reg_no].write(1 << offset);
+        }
+    }
+
+    pub fn set_priority(int: Interrupt, prio: u8) {
+        let nvic = unsafe { &*(super::periph_base_addr::NVIC as *const Nvic) };
+
+        unsafe {
+            nvic.ipr[int as usize].write(prio);
+        }
+    }
 }
 
 pub mod rcc {

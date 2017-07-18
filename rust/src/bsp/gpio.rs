@@ -53,6 +53,8 @@ struct PortRegs {
 #[derive(Clone, Copy)]
 pub enum Gpio {
     GpioA,
+    GpioB,
+    GpioC,
 }
 
 #[derive(Clone, Copy)]
@@ -139,6 +141,8 @@ impl Pin {
     pub fn new(port: Gpio, pin_num: PinNum) -> Pin {
         let base_addr = match port {
             Gpio::GpioA => bsp::periph_base_addr::GPIOA,
+            Gpio::GpioB => bsp::periph_base_addr::GPIOB,
+            Gpio::GpioC => bsp::periph_base_addr::GPIOC,
         };
 
         Pin {

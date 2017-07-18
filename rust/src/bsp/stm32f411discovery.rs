@@ -14,7 +14,7 @@ pub mod periph_base_addr {
     pub const NVIC: usize = 0xE000E100;
 }
 
-pub mod nvic_impl {
+pub mod nvic {
     use volatile_register::{RW, RO, WO};
 
     struct Nvic {
@@ -28,8 +28,8 @@ pub mod nvic_impl {
         _padding4: [u8; 0x74],
         _iabr: [RO<u32>; 3],
         _padding5: [u8; 0xf4],
-        ipr: [RW<u8>; 21],
-        _padding6: [u8; 0xaac],
+        ipr: [RW<u8>; 81],
+        _padding6: [u8; 0xaaf],
         _stir: WO<u32>,
     }
 

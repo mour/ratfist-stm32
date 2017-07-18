@@ -8,6 +8,8 @@
 
 #include "spinner/spinner.h"
 
+#include "meteo/meteo.h"
+
 int main(void)
 {
 	os_init();
@@ -18,6 +20,10 @@ int main(void)
 
 #ifdef INCLUDE_SPINNER
 	spinner_init();
+#endif
+
+#ifdef INCLUDE_METEO
+	meteo_init();
 #endif
 
 	os_tasks_start(1000);

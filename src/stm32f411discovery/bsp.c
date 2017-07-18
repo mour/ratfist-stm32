@@ -24,6 +24,8 @@
 
 #include "../bsp.h" // For the BSP declarations.
 
+void rust_bsp_init(void);
+
 static bool is_initialized = false;
 
 static uint16_t led_pin_lut[] = {
@@ -124,6 +126,8 @@ void bsp_init(void)
 	led_init();
 
 	comm_init();
+
+	rust_bsp_init();
 
 	is_initialized = true;
 }

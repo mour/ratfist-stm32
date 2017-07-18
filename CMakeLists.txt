@@ -64,6 +64,7 @@ set(SPINNER_SOURCES
 )
 
 set(METEO_SOURCES
+    "${CMAKE_CURRENT_LIST_DIR}/src/meteo/meteo.c"
     "${CMAKE_CURRENT_LIST_DIR}/src/meteo/${BOARD_TYPE}/bsp.c"
 )
 
@@ -103,6 +104,7 @@ target_compile_options(${PROJECT_NAME}
 target_compile_definitions(${PROJECT_NAME} PUBLIC
     "$<UPPER_CASE:${BOARD_TYPE}>"
     "$<$<BOOL:${INCLUDE_SPINNER}>:INCLUDE_SPINNER>"
+    "$<$<BOOL:${INCLUDE_METEO}>:INCLUDE_METEO>"
 )
 
 

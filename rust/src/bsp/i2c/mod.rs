@@ -6,6 +6,7 @@ mod i2c_v1;
 use self::i2c_v1 as i2c_impl;
 
 pub use self::i2c_impl::rust_i2c_interrupt_handler;
+pub use self::i2c_impl::peripheral_init;
 
 use core::mem;
 
@@ -60,12 +61,16 @@ struct Transaction<'a, 'b: 'a> {
 
 impl<'a, 'b> Transaction<'a, 'b> {
     fn on_last_step(&self) -> bool {
-        self.curr_step >= self.steps.len()
+        self.curr_step + 1 >= self.steps.len()
     }
 }
 
-pub enum Peripherals {
+#[derive(Clone, Copy)]
+#[repr(u32)]
+pub enum Peripheral {
     I2C1 = 0,
+    I2C2 = 1,
+    I2C3 = 2,
 }
 
 pub struct I2C<'a, 'b: 'a> {
@@ -73,7 +78,7 @@ pub struct I2C<'a, 'b: 'a> {
 }
 
 impl<'a, 'b> I2C<'a, 'b> {
-    pub fn new(periph: Peripherals) -> I2C<'a, 'b> {
+    pub fn new(periph: Peripheral) -> I2C<'a, 'b> {
         I2C {
             it_context: unsafe {
                 mem::transmute::<&mut InterruptContext, &mut InterruptContext>(
@@ -86,13 +91,15 @@ impl<'a, 'b> I2C<'a, 'b> {
     pub fn run_transaction(&mut self, device_addr: u8, steps: &mut [Step]) -> Result<(), ()> {
         unsafe {
             critical!({
-                if self.it_context.current_transaction.is_some() ||
-                    matches!(self.it_context.state, PeripheralState::Done(_))
-                {
+                if self.it_context.current_transaction.is_some() {
                     return Err(());
                 }
 
-                let periph = i2c_impl::I2C::get_periph(self.it_context.periph_addr);
+                if !matches!(self.it_context.state, PeripheralState::Done(_)) {
+                    return Err(());
+                }
+
+                let periph = i2c_impl::I2C::get_periph(self.it_context.periph_id);
                 periph.reset();
 
                 self.it_context.current_transaction = Some(Transaction {
@@ -100,6 +107,9 @@ impl<'a, 'b> I2C<'a, 'b> {
                     curr_step: 0,
                     device_addr: device_addr,
                 });
+
+                self.it_context.state = PeripheralState::StartBitSet;
+                periph.send_start();
             });
 
             loop {
@@ -112,7 +122,7 @@ impl<'a, 'b> I2C<'a, 'b> {
                             } else {
                                 return Err(());
                             }
-                        },
+                        }
                         _ => {}
                     }
                 });
@@ -121,12 +131,8 @@ impl<'a, 'b> I2C<'a, 'b> {
     }
 }
 
-
 pub struct InterruptContext<'a, 'b: 'a> {
     current_transaction: Option<Transaction<'a, 'b>>,
-    periph_addr: usize,
+    periph_id: Peripheral,
     state: PeripheralState,
 }
-
-
-

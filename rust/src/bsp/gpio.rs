@@ -61,7 +61,7 @@ pub enum Gpio {
 pub enum Mode {
     Input,
     Output(OutputType, OutputSpeed),
-    AlternateFunction(AltFuncNum),
+    AlternateFunction(AltFuncNum, OutputType, OutputSpeed),
     Analog,
 }
 
@@ -158,45 +158,23 @@ impl Pin {
                 let new_mode = match mode {
                     Mode::Input => GPIO_MODER_MODER_INPUT,
                     Mode::Output(_, _) => GPIO_MODER_MODER_OUTPUT,
-                    Mode::AlternateFunction(_) => GPIO_MODER_MODER_AF,
+                    Mode::AlternateFunction(_, _, _) => GPIO_MODER_MODER_AF,
                     Mode::Analog => GPIO_MODER_MODER_ANALOG,
                 } << (2 * self.pin_num);
 
                 (curr & !mask) | new_mode
             });
         }
+
         match mode {
-            Mode::Output(otype, ospeed) => unsafe {
-                self.port.otyper.modify(|curr| {
-                    let mask = 0x3 << (2 * self.pin_num);
-                    let new_type = (otype as u32) << (2 * self.pin_num);
-
-                    (curr & !mask) | new_type
-                });
-
-                self.port.ospeedr.modify(|curr| {
-                    let mask = 0x3 << (2 * self.pin_num);
-                    let new_speed = (ospeed as u32) << (2 * self.pin_num);
-
-                    (curr & !mask) | new_speed
-                });
-            },
-            Mode::AlternateFunction(af_num) => {
-                let reg = if self.pin_num < 8 {
-                    &self.port.afrl
-                } else {
-                    &self.port.afrh
-                };
-
-                unsafe {
-                    reg.modify(|curr| {
-                        let offset = (self.pin_num % 8) * 4;
-                        let mask = 0xf << offset;
-                        let new_af_num = (af_num as u32) << offset;
-
-                        (curr & !mask) | new_af_num
-                    });
-                }
+            Mode::Output(otype, ospeed) => {
+                self.set_output_type(otype);
+                self.set_output_speed(ospeed);
+            }
+            Mode::AlternateFunction(af_num, otype, ospeed) => {
+                self.set_alternate_function(af_num);
+                self.set_output_type(otype);
+                self.set_output_speed(ospeed);
             }
             _ => {}
         }
@@ -234,6 +212,46 @@ impl Pin {
             self.reset();
         } else {
             self.set();
+        }
+    }
+
+    fn set_output_type(&self, otype: OutputType) {
+        unsafe {
+            self.port.otyper.modify(|curr| {
+                let mask = 1 << self.pin_num;
+                let new_type = (otype as u32) << self.pin_num;
+
+                (curr & !mask) | new_type
+            });
+        }
+    }
+
+    fn set_output_speed(&self, ospeed: OutputSpeed) {
+        unsafe {
+            self.port.ospeedr.modify(|curr| {
+                let mask = 0x3 << (2 * self.pin_num);
+                let new_speed = (ospeed as u32) << (2 * self.pin_num);
+
+                (curr & !mask) | new_speed
+            });
+        }
+    }
+
+    fn set_alternate_function(&self, af: AltFuncNum) {
+        let reg = if self.pin_num < 8 {
+            &self.port.afrl
+        } else {
+            &self.port.afrh
+        };
+
+        unsafe {
+            reg.modify(|curr| {
+                let offset = (self.pin_num % 8) * 4;
+                let mask = 0xf << offset;
+                let new_af_num = (af as u32) << offset;
+
+                (curr & !mask) | new_af_num
+            });
         }
     }
 }

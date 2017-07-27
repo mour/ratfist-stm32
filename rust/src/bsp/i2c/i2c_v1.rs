@@ -98,10 +98,18 @@ pub fn peripheral_init(periph: Peripheral) {
             let sda = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin9);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            sda.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            sda.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             scl.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            scl.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            scl.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             rcc::enable_periph(rcc::Peripheral::I2C1);
             nvic::enable_interrupt(nvic::Interrupt::I2C1Ev);
@@ -114,10 +122,18 @@ pub fn peripheral_init(periph: Peripheral) {
             let sda = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin3);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            sda.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            sda.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             scl.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            scl.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            scl.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             rcc::enable_periph(rcc::Peripheral::I2C2);
             nvic::enable_interrupt(nvic::Interrupt::I2C2Ev);
@@ -131,10 +147,18 @@ pub fn peripheral_init(periph: Peripheral) {
             let sda = gpio::Pin::new(gpio::Gpio::GpioC, gpio::PinNum::Pin9);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            sda.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            sda.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             scl.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
-            scl.set_mode(gpio::Mode::AlternateFunction(gpio::AltFuncNum::Af4));
+            scl.set_mode(gpio::Mode::AlternateFunction(
+                gpio::AltFuncNum::Af4,
+                gpio::OutputType::OpenDrain,
+                gpio::OutputSpeed::High,
+            ));
 
             rcc::enable_periph(rcc::Peripheral::I2C3);
             nvic::enable_interrupt(nvic::Interrupt::I2C3Ev);

@@ -456,17 +456,22 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                     }
 
                 } else if next_byte_pos == trans.steps[trans.curr_step].len() - 2 {
+                    if periph.is_rxne_set() {
+                        periph.disable_ack();
+                    }
+
                     if !periph.is_btf_set() {
                         return;
                     }
 
-                    periph.send_stop();
+                    if trans.on_last_step() {
+                        periph.send_stop();
+                    }
 
                     trans.steps[trans.curr_step].as_mut()[next_byte_pos] = periph.read_data();
                     trans.steps[trans.curr_step].as_mut()[next_byte_pos + 1] = periph.read_data();
 
                     if trans.on_last_step() {
-                        periph.send_stop();
                         ctx.state = PeripheralState::Done(0);
                     } else {
                         periph.send_start();
@@ -477,10 +482,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                 } else {
                     if !periph.is_rxne_set() {
                         return;
-                    }
-
-                    if next_byte_pos == trans.steps[trans.curr_step].len() - 3 {
-                        periph.disable_ack();
                     }
 
                     trans.steps[trans.curr_step].as_mut()[next_byte_pos] = periph.read_data();

@@ -9,6 +9,7 @@ pub use self::i2c_impl::rust_i2c_interrupt_handler;
 pub use self::i2c_impl::peripheral_init;
 
 use core::mem;
+use core::cell::Cell;
 
 #[derive(PartialEq)]
 enum PeripheralState {
@@ -74,49 +75,51 @@ pub enum Peripheral {
 }
 
 pub struct I2C<'a, 'b: 'a> {
-    it_context: &'a mut InterruptContext<'a, 'b>,
+    it_context: Cell<*mut InterruptContext<'a, 'b>>,
 }
 
 impl<'a, 'b> I2C<'a, 'b> {
     pub fn new(periph: Peripheral) -> I2C<'a, 'b> {
         I2C {
-            it_context: unsafe {
+            it_context: Cell::new(unsafe {
                 mem::transmute::<&mut InterruptContext, &mut InterruptContext>(
                     &mut i2c_impl::I2C_PERIPHS[periph as usize],
                 )
-            },
+            }),
         }
     }
 
-    pub fn run_transaction(&mut self, device_addr: u8, steps: &mut [Step]) -> Result<(), ()> {
+    pub fn run_transaction(&self, device_addr: u8, steps: &mut [Step]) -> Result<(), ()> {
         unsafe {
+            let ctx = &mut *self.it_context.get();
+
             critical!({
-                if self.it_context.current_transaction.is_some() {
+                if ctx.current_transaction.is_some() {
                     return Err(());
                 }
 
-                if !matches!(self.it_context.state, PeripheralState::Done(_)) {
+                if !matches!(ctx.state, PeripheralState::Done(_)) {
                     return Err(());
                 }
 
-                let periph = i2c_impl::I2C::get_periph(self.it_context.periph_id);
+                let periph = i2c_impl::I2C::get_periph(ctx.periph_id);
                 periph.reset();
 
-                self.it_context.current_transaction = Some(Transaction {
+                ctx.current_transaction = Some(Transaction {
                     steps: mem::transmute::<&mut [Step], &mut [Step]>(steps),
                     curr_step: 0,
                     device_addr: device_addr,
                 });
 
-                self.it_context.state = PeripheralState::StartBitSet;
+                ctx.state = PeripheralState::StartBitSet;
                 periph.send_start();
             });
 
             loop {
                 critical!({
-                    match self.it_context.state {
+                    match ctx.state {
                         PeripheralState::Done(ret_val) => {
-                            self.it_context.current_transaction = None;
+                            ctx.current_transaction = None;
                             if ret_val == 0 {
                                 return Ok(());
                             } else {

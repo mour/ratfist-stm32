@@ -1,5 +1,5 @@
 
-use i2c;
+use bsp::i2c;
 
 use mouros_rust_bindings::tasks;
 
@@ -48,19 +48,19 @@ struct CalibrationData {
 }
 
 
-pub struct Bmp085 {
+pub struct Bmp085<'a, 'b: 'a> {
     calib: Option<CalibrationData>,
     dev_addr: u8,
-    i2c_periph: usize,
+    i2c_bus: i2c::I2C<'a, 'b>,
     precision: Precision,
 }
 
-impl Bmp085 {
-    pub fn new(periph: usize) -> Bmp085 {
+impl<'a, 'b> Bmp085<'a, 'b> {
+    pub fn new(periph: i2c::Peripheral) -> Bmp085<'a, 'b> {
         Bmp085 {
             calib: None,
             dev_addr: BMP085_I2C_ADDR,
-            i2c_periph: periph,
+            i2c_bus: i2c::I2C::new(periph),
             precision: Precision::Standard
         }
     }
@@ -69,7 +69,7 @@ impl Bmp085 {
         let mut set_addr = [0xaa];
         let mut conf_data = [0; 22];
 
-        i2c::start_transaction(
+        self.i2c_bus.run_transaction(
             self.dev_addr,
             &mut [
                 i2c::Step::Write(&mut set_addr),
@@ -100,11 +100,11 @@ impl Bmp085 {
         let mut t_data_addr = [0xf6];
         let mut t_data_buf = [0; 2];
 
-        i2c::start_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)]);
+        self.i2c_bus.run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)]);
 
         tasks::sleep(5);
 
-        i2c::start_transaction(
+        self.i2c_bus.run_transaction(
             self.dev_addr,
             &mut [
                 i2c::Step::Write(&mut t_data_addr),
@@ -121,11 +121,11 @@ impl Bmp085 {
         let mut p_data_addr = [0xf6];
         let mut p_data_buf = [0; 3];
 
-        i2c::start_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)]);
+        self.i2c_bus.run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)]);
 
         tasks::sleep(self.precision.get_pressure_conversion_time_ms());
 
-        i2c::start_transaction(
+        self.i2c_bus.run_transaction(
             self.dev_addr,
             &mut [
                 i2c::Step::Write(&mut p_data_addr),

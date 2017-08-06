@@ -48,20 +48,20 @@ struct CalibrationData {
 }
 
 
-pub struct Bmp085<'a, 'b: 'a> {
+pub struct Bmp085 {
     calib: Option<CalibrationData>,
     dev_addr: u8,
-    i2c_bus: i2c::I2C<'a, 'b>,
+    i2c_bus: i2c::Peripheral,
     precision: Precision,
 }
 
-impl<'a, 'b> Bmp085<'a, 'b> {
-    pub fn new(periph: i2c::Peripheral) -> Bmp085<'a, 'b> {
+impl Bmp085 {
+    pub fn new(periph: i2c::Peripheral) -> Bmp085 {
         Bmp085 {
             calib: None,
             dev_addr: BMP085_I2C_ADDR,
-            i2c_bus: i2c::I2C::new(periph),
-            precision: Precision::Standard
+            i2c_bus: periph,
+            precision: Precision::Standard,
         }
     }
 
@@ -100,7 +100,10 @@ impl<'a, 'b> Bmp085<'a, 'b> {
         let mut t_data_addr = [0xf6];
         let mut t_data_buf = [0; 2];
 
-        self.i2c_bus.run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)]);
+        self.i2c_bus.run_transaction(
+            self.dev_addr,
+            &mut [i2c::Step::Write(&mut t_meas_cmd)],
+        );
 
         tasks::sleep(5);
 
@@ -121,7 +124,10 @@ impl<'a, 'b> Bmp085<'a, 'b> {
         let mut p_data_addr = [0xf6];
         let mut p_data_buf = [0; 3];
 
-        self.i2c_bus.run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)]);
+        self.i2c_bus.run_transaction(
+            self.dev_addr,
+            &mut [i2c::Step::Write(&mut p_meas_cmd)],
+        );
 
         tasks::sleep(self.precision.get_pressure_conversion_time_ms());
 

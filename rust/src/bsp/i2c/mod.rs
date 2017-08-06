@@ -1,5 +1,4 @@
 
-
 #[cfg(feature = "stm32f411discovery")]
 mod i2c_v1;
 #[cfg(feature = "stm32f411discovery")]
@@ -9,7 +8,6 @@ pub use self::i2c_impl::rust_i2c_interrupt_handler;
 pub use self::i2c_impl::peripheral_init;
 
 use core::mem;
-use core::cell::Cell;
 
 #[derive(PartialEq)]
 enum PeripheralState {
@@ -74,24 +72,18 @@ pub enum Peripheral {
     I2C3 = 2,
 }
 
-pub struct I2C<'a, 'b: 'a> {
-    it_context: Cell<*mut InterruptContext<'a, 'b>>,
-}
-
-impl<'a, 'b> I2C<'a, 'b> {
-    pub fn new(periph: Peripheral) -> I2C<'a, 'b> {
-        I2C {
-            it_context: Cell::new(unsafe {
-                mem::transmute::<&mut InterruptContext, &mut InterruptContext>(
-                    &mut i2c_impl::I2C_PERIPHS[periph as usize],
-                )
-            }),
+impl<'a, 'b> Peripheral {
+    fn get_ctx(&self) -> &'a mut InterruptContext<'a, 'b> {
+        unsafe {
+            mem::transmute::<&mut InterruptContext, &mut InterruptContext>(
+                &mut i2c_impl::I2C_PERIPHS[*self as usize],
+            )
         }
     }
 
     pub fn run_transaction(&self, device_addr: u8, steps: &mut [Step]) -> Result<(), ()> {
         unsafe {
-            let ctx = &mut *self.it_context.get();
+            let ctx = self.get_ctx();
 
             critical!({
                 if ctx.current_transaction.is_some() {

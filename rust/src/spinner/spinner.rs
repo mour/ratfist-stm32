@@ -101,26 +101,39 @@ impl<'a> TryFrom<*mut message_dispatcher::message> for Message<'a> {
 
             match (*raw_msg_ptr).msg_type {
                 MsgTypes::SET_PLAN => {
-                    Ok(Message::SetSpinPlan(&mut *((*raw_msg_ptr).data as *mut spin_plan_data)))
+                    Ok(Message::SetSpinPlan(
+                        &mut *((*raw_msg_ptr).data as *mut spin_plan_data),
+                    ))
                 }
                 MsgTypes::GET_PLAN => {
-                    Ok(Message::GetSpinPlan(&mut *((*raw_msg_ptr).data as *mut spin_channel)))
+                    Ok(Message::GetSpinPlan(
+                        &mut *((*raw_msg_ptr).data as *mut spin_channel),
+                    ))
                 }
                 MsgTypes::PLAN_REPLY => {
-                    Ok(Message::SpinPlanReply(&mut *((*raw_msg_ptr).data as *mut spin_plan_data)))
+                    Ok(Message::SpinPlanReply(
+                        &mut *((*raw_msg_ptr).data as *mut spin_plan_data),
+                    ))
                 }
                 MsgTypes::SET_STATE => {
-                    Ok(Message::SetSpinState(&mut *((*raw_msg_ptr).data as
-                                                    *mut spin_state_set_data)))
+                    Ok(Message::SetSpinState(
+                        &mut *((*raw_msg_ptr).data as *mut spin_state_set_data),
+                    ))
                 }
                 MsgTypes::GET_STATE => {
-                    Ok(Message::GetSpinState(&mut *((*raw_msg_ptr).data as *mut spin_channel)))
+                    Ok(Message::GetSpinState(
+                        &mut *((*raw_msg_ptr).data as *mut spin_channel),
+                    ))
                 }
                 MsgTypes::STATE_REPLY => {
-                    Ok(Message::SpinStateReply(&mut *((*raw_msg_ptr).data as *mut spin_state_data)))
+                    Ok(Message::SpinStateReply(
+                        &mut *((*raw_msg_ptr).data as *mut spin_state_data),
+                    ))
                 }
                 MsgTypes::RET_VAL => {
-                    Ok(Message::ReturnValue(&mut *((*raw_msg_ptr).data as *mut ret_val)))
+                    Ok(Message::ReturnValue(
+                        &mut *((*raw_msg_ptr).data as *mut ret_val),
+                    ))
                 }
                 _ => {
                     Self::free(raw_msg_ptr);
@@ -295,21 +308,20 @@ impl Channel {
 
     fn set_channel_state(&mut self, data: &spin_state_set_data) {
         critical!({
-                      if self.state == ChannelState::Running && data.state == SpinStates::STOPPED {
-                          self.state = ChannelState::Spindown;
-                      } else if self.state == ChannelState::Stopped &&
-                      data.state == SpinStates::RUNNING {
+            if self.state == ChannelState::Running && data.state == SpinStates::STOPPED {
+                self.state = ChannelState::Spindown;
+            } else if self.state == ChannelState::Stopped && data.state == SpinStates::RUNNING {
                 self.state = ChannelState::Running;
             }
-                  });
+        });
     }
 
     fn set_channel_plan(&mut self, data: &spin_plan_data) {
         critical!({
-                      if self.state != ChannelState::Stopped {
-                          return;
-                      }
-                  });
+            if self.state != ChannelState::Stopped {
+                return;
+            }
+        });
 
         self.plan_len = data.spin_plan_leg_count as usize;
         for leg_idx in 0..self.plan_len {
@@ -391,15 +403,17 @@ fn get_free_fn() -> unsafe extern "C" fn(msg: *mut message_dispatcher::message) 
 pub extern "C" fn spinner_rust_init(conf: *mut message_dispatcher::subsystem_message_conf) {
     unsafe {
         if conf.is_null() || (*conf).incoming_msg_queue.is_null() ||
-           (*conf).outgoing_msg_queue.is_null() || (*conf).outgoing_err_queue.is_null() ||
-           (*conf).alloc_message.is_some() || (*conf).free_message.is_some() {
+            (*conf).outgoing_msg_queue.is_null() ||
+            (*conf).outgoing_err_queue.is_null() || (*conf).alloc_message.is_some() ||
+            (*conf).free_message.is_some()
+        {
             panic!();
         }
 
         SPINNER_CTX = Some(SpinnerContext {
-                               channels: [Channel::default(); NUM_CHANNELS],
-                               subsystem_conf: &*conf,
-                           });
+            channels: [Channel::default(); NUM_CHANNELS],
+            subsystem_conf: &*conf,
+        });
     }
 }
 
@@ -416,29 +430,37 @@ pub extern "C" fn spinner_comm_loop(_params: *mut CVoid) {
                 Message::SetSpinPlan(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        channels[ch_num].send_event(msg.get_transaction_id(),
-                                                    SpinnerEvent::SetPlan(data));
+                        channels[ch_num].send_event(
+                            msg.get_transaction_id(),
+                            SpinnerEvent::SetPlan(data),
+                        );
                     }
                 }
                 Message::GetSpinPlan(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        channels[ch_num].send_event(msg.get_transaction_id(),
-                                                    SpinnerEvent::GetPlan);
+                        channels[ch_num].send_event(
+                            msg.get_transaction_id(),
+                            SpinnerEvent::GetPlan,
+                        );
                     }
                 }
                 Message::SetSpinState(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        channels[ch_num].send_event(msg.get_transaction_id(),
-                                                    SpinnerEvent::SetState(data));
+                        channels[ch_num].send_event(
+                            msg.get_transaction_id(),
+                            SpinnerEvent::SetState(data),
+                        );
                     }
                 }
                 Message::GetSpinState(ref data) => {
                     let ch_num = data.channel_num as usize;
                     if ch_num < NUM_CHANNELS {
-                        channels[ch_num].send_event(msg.get_transaction_id(),
-                                                    SpinnerEvent::GetState);
+                        channels[ch_num].send_event(
+                            msg.get_transaction_id(),
+                            SpinnerEvent::GetState,
+                        );
                     }
                 }
                 _ => {}

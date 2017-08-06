@@ -20,11 +20,14 @@ pub struct message {
 #[repr(C)]
 pub struct message_handler {
     pub message_name: *const u8,
-    pub parsing_func: Option<unsafe extern "C" fn(msg_ptr: *mut message, save_ptr: *mut i8) -> bool>,
-    pub serialization_func: Option<unsafe extern "C" fn(msg_ptr: *const message,
-                                                        output_str: *mut i8,
-                                                        output_str_max_len: u32)
-                                                        -> isize>,
+    pub parsing_func:
+        Option<unsafe extern "C" fn(msg_ptr: *mut message, save_ptr: *mut i8) -> bool>,
+    pub serialization_func: Option<
+        unsafe extern "C" fn(msg_ptr: *const message,
+                             output_str: *mut i8,
+                             output_str_max_len: u32)
+                             -> isize,
+    >,
 }
 
 #[repr(C)]
@@ -59,13 +62,18 @@ pub trait MemManagement {
 }
 
 pub trait Wrappable: MemManagement + TryFrom<*mut message, Error = ()> {}
-impl<T> Wrappable for T where T: MemManagement + TryFrom<*mut message, Error = ()> {}
+impl<T> Wrappable for T
+where
+    T: MemManagement + TryFrom<*mut message, Error = ()>,
+{
+}
 
 
 
 
 impl<T> Drop for MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     fn drop(&mut self) {
         T::free(self.raw_msg_ref);
@@ -74,7 +82,8 @@ impl<T> Drop for MessageWrapper<T>
 
 
 impl<T> Deref for MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     type Target = T;
 
@@ -84,7 +93,8 @@ impl<T> Deref for MessageWrapper<T>
 }
 
 impl<T> DerefMut for MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.msg
@@ -92,7 +102,8 @@ impl<T> DerefMut for MessageWrapper<T>
 }
 
 impl<T> Into<*mut message> for MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     fn into(self) -> *mut message {
         let raw_msg_ptr = self.raw_msg_ref;
@@ -106,7 +117,8 @@ impl<T> Into<*mut message> for MessageWrapper<T>
 
 
 impl<T> TryFrom<*mut message> for MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     type Error = ();
 
@@ -118,15 +130,16 @@ impl<T> TryFrom<*mut message> for MessageWrapper<T>
         };
 
         Ok(MessageWrapper {
-               msg: T::try_from(raw_msg_ptr)?,
-               raw_msg_ref: raw_msg_ptr,
-           })
+            msg: T::try_from(raw_msg_ptr)?,
+            raw_msg_ref: raw_msg_ptr,
+        })
     }
 }
 
 
 impl<T> MessageWrapper<T>
-    where T: Wrappable
+where
+    T: Wrappable,
 {
     pub fn new(trans_id: u32, msg_type: u32) -> Result<MessageWrapper<T>, ()> {
 

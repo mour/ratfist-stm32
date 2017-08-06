@@ -30,6 +30,5 @@ pub mod gpio;
 pub extern "C" fn rust_bsp_init() {
     board_specific_init();
 
-    #[cfg(feature = "stm32f411discovery")]
-    i2c::peripheral_init(i2c::Peripheral::I2C3);
+    #[cfg(feature = "stm32f411discovery")] i2c::peripheral_init(i2c::Peripheral::I2C3);
 }

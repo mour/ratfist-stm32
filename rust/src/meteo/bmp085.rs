@@ -78,17 +78,17 @@ impl Bmp085 {
         );
 
         self.calib = Some(CalibrationData {
-            ac1: ((conf_data[0] as u32) << 8 | conf_data[1] as u32) as i32,
-            ac2: ((conf_data[2] as u32) << 8 | conf_data[3] as u32) as i32,
-            ac3: ((conf_data[4] as u32) << 8 | conf_data[5] as u32) as i32,
+            ac1: ((conf_data[0] as u16) << 8 | conf_data[1] as u16) as i16 as i32,
+            ac2: ((conf_data[2] as u16) << 8 | conf_data[3] as u16) as i16 as i32,
+            ac3: ((conf_data[4] as u16) << 8 | conf_data[5] as u16) as i16 as i32,
             ac4: (conf_data[6] as u32) << 8 | conf_data[7] as u32,
-            ac5: ((conf_data[8] as u32) << 8 | conf_data[9] as u32) as i32,
-            ac6: ((conf_data[10] as u32) << 8 | conf_data[11] as u32) as i32,
-            b1: ((conf_data[12] as u32) << 8 | conf_data[13] as u32) as i32,
-            b2: ((conf_data[14] as u32) << 8 | conf_data[15] as u32) as i32,
-            _mb: ((conf_data[16] as u32) << 8 | conf_data[17] as u32) as i32,
-            mc: ((conf_data[18] as u32) << 8 | conf_data[19] as u32) as i32,
-            md: ((conf_data[20] as u32) << 8 | conf_data[21] as u32) as i32,
+            ac5: ((conf_data[8] as u16) << 8 | conf_data[9] as u16) as i16 as i32,
+            ac6: ((conf_data[10] as u16) << 8 | conf_data[11] as u16) as i16 as i32,
+            b1: ((conf_data[12] as u16) << 8 | conf_data[13] as u16) as i16 as i32,
+            b2: ((conf_data[14] as u16) << 8 | conf_data[15] as u16) as i16 as i32,
+            _mb: ((conf_data[16] as u16) << 8 | conf_data[17] as u16) as i16 as i32,
+            mc: ((conf_data[18] as u16) << 8 | conf_data[19] as u16) as i16 as i32,
+            md: ((conf_data[20] as u16) << 8 | conf_data[21] as u16) as i16 as i32,
         });
 
         Ok(())
@@ -120,7 +120,9 @@ impl Bmp085 {
 
 
     fn get_raw_pressure_val(&self) -> i32 {
-        let mut p_meas_cmd = [0xf4, 0x34];
+        let oss = self.precision.get_oversampling_param();
+
+        let mut p_meas_cmd = [0xf4, (0x34 + (oss << 6)) as u8];
         let mut p_data_addr = [0xf6];
         let mut p_data_buf = [0; 3];
 
@@ -140,7 +142,7 @@ impl Bmp085 {
         );
 
         (((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32) >>
-             self.precision.get_oversampling_param()) as i32
+             (8 - oss)) as i32
     }
 
     pub fn set_precision(&mut self, precision: Precision) {
@@ -178,7 +180,7 @@ impl Bmp085 {
         let x2: i32 = (calib.b1 * ((b6 * b6) >> 12)) >> 16;
         let x3: i32 = ((x1 + x2) + 2) >> 2;
         let b4: u32 = calib.ac4 * ((x3 + 32768) as u32) >> 15;
-        let b7: u32 = (up as u32 - b3 as u32) * (50000 >> oss);
+        let b7: u32 = ((up - b3) as u32) * (50000 >> oss);
 
         let p1: i32 = if b7 < 0x80000000 {
             ((b7 << 1) / b4) as i32

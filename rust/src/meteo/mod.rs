@@ -17,7 +17,9 @@ pub extern "C" fn rust_meteo_comm_loop(_params: *mut CVoid) {
     bmp.set_precision(bmp085::Precision::UltraHigh);
 
     loop {
-        let _ = bmp.measure();
+        if let Ok((temp, press)) = bmp.measure() {
+            tasks::sleep(5000);
+        };
 
         tasks::sleep(1000);
     }

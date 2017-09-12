@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use mouros_rust_bindings::mailbox;
-
 #[allow(non_snake_case)]
 pub mod BoardLed {
     pub const LED1: i32 = 0;

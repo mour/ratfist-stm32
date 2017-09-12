@@ -1,12 +1,11 @@
 
-use mouros_rust_bindings::mailbox::{Mailbox, MailboxRaw};
+use mouros_rust_bindings::mailbox::Mailbox;
 use mouros_rust_bindings::CVoid;
 use mouros_rust_bindings::tasks;
 
 use bindings::constants;
 use bindings::message_dispatcher;
 
-use core::ptr;
 use core::convert::TryFrom;
 
 use bindings::message_dispatcher::{MessageWrapper, MemManagement};
@@ -351,28 +350,36 @@ fn get_channels() -> &'static mut [Channel] {
     }
 }
 
-fn get_incoming_queue() -> &'static mut Mailbox<*mut message_dispatcher::message> {
+fn get_incoming_queue() -> &'static mut Mailbox<'static, *mut message_dispatcher::message> {
     unsafe {
         match SPINNER_CTX {
-            Some(ref ctx) => &mut *ctx.subsystem_conf.incoming_msg_queue,
+            Some(ref ctx) => {
+                &mut *(ctx.subsystem_conf.incoming_msg_queue as
+                           *mut Mailbox<'static, *mut message_dispatcher::message>)
+            }
             None => panic!(),
         }
     }
 }
 
-fn get_outgoing_queue() -> &'static mut Mailbox<*mut message_dispatcher::message> {
+fn get_outgoing_queue() -> &'static mut Mailbox<'static, *mut message_dispatcher::message> {
     unsafe {
         match SPINNER_CTX {
-            Some(ref ctx) => &mut *ctx.subsystem_conf.outgoing_msg_queue,
+            Some(ref ctx) => {
+                &mut *(ctx.subsystem_conf.outgoing_msg_queue as
+                           *mut Mailbox<'static, *mut message_dispatcher::message>)
+            }
             None => panic!(),
         }
     }
 }
 
-fn get_outgoing_error_queue() -> &'static mut Mailbox<i32> {
+fn get_outgoing_error_queue() -> &'static mut Mailbox<'static, i32> {
     unsafe {
         match SPINNER_CTX {
-            Some(ref ctx) => &mut *ctx.subsystem_conf.outgoing_err_queue,
+            Some(ref ctx) => {
+                &mut *(ctx.subsystem_conf.outgoing_err_queue as *mut Mailbox<'static, i32>)
+            }
             None => panic!(),
         }
     }
@@ -404,8 +411,8 @@ pub extern "C" fn spinner_rust_init(conf: *mut message_dispatcher::subsystem_mes
     unsafe {
         if conf.is_null() || (*conf).incoming_msg_queue.is_null() ||
             (*conf).outgoing_msg_queue.is_null() ||
-            (*conf).outgoing_err_queue.is_null() || (*conf).alloc_message.is_some() ||
-            (*conf).free_message.is_some()
+            (*conf).outgoing_err_queue.is_null() || (*conf).alloc_message.is_none() ||
+            (*conf).free_message.is_none()
         {
             panic!();
         }

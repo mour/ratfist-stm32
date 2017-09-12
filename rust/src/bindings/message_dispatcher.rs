@@ -8,7 +8,7 @@ use core::ops::{Deref, DerefMut};
 use core::convert::TryFrom;
 
 use mouros_rust_bindings::CVoid;
-use mouros_rust_bindings::mailbox::Mailbox;
+use mouros_rust_bindings::mailbox::MailboxRaw;
 
 #[repr(C)]
 pub struct message {
@@ -16,6 +16,7 @@ pub struct message {
     transaction_id: u32,
     pub data: *mut CVoid,
 }
+
 
 #[repr(C)]
 pub struct message_handler {
@@ -32,12 +33,12 @@ pub struct message_handler {
 
 #[repr(C)]
 pub struct subsystem_message_conf {
-    pub subsystem_name: *const i8,
-    pub message_handlers: *mut message_handler,
+    pub subsystem_name: *const u8,
+    pub message_handlers: *const message_handler,
     pub num_message_types: u32,
-    pub incoming_msg_queue: *mut Mailbox<*mut message>,
-    pub outgoing_msg_queue: *mut Mailbox<*mut message>,
-    pub outgoing_err_queue: *mut Mailbox<i32>,
+    pub incoming_msg_queue: *mut MailboxRaw,
+    pub outgoing_msg_queue: *mut MailboxRaw,
+    pub outgoing_err_queue: *mut MailboxRaw,
     pub alloc_message: Option<unsafe extern "C" fn(msg_type_id: u32) -> *mut message>,
     pub free_message: Option<unsafe extern "C" fn(msg: *mut message)>,
 }
@@ -156,5 +157,27 @@ where
 
     pub fn get_transaction_id(&self) -> u32 {
         unsafe { (*self.raw_msg_ref).transaction_id }
+    }
+}
+
+
+pub struct SyncMemory<T>(T);
+unsafe impl<T> Sync for SyncMemory<T> {}
+
+impl<T> SyncMemory<T> {
+    pub fn new(item: T) -> SyncMemory<T> {
+        SyncMemory(item)
+    }
+}
+
+impl<T> AsRef<T> for SyncMemory<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T> AsMut<T> for SyncMemory<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }

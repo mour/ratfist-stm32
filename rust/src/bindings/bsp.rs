@@ -11,11 +11,6 @@ pub mod BoardLed {
 }
 
 extern "C" {
-    pub static mut bsp_rx_buffer: mailbox::Mailbox<u8>;
-    pub static mut bsp_tx_buffer: mailbox::Mailbox<u8>;
-}
-
-extern "C" {
     fn bsp_led_get_state(led: i32) -> u8;
     fn bsp_led_on(led: i32);
     fn bsp_led_off(led: i32);

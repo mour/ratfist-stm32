@@ -19,7 +19,7 @@ use core::ptr;
 use core::mem;
 
 mod bmp085;
-
+mod tsl2651;
 
 
 const GET_TEMPERATURE_MSG_ID: u32 = 0;
@@ -56,9 +56,13 @@ unsafe extern "C" fn meteo_free(msg: *mut md::message) {
 }
 
 
-unsafe extern "C" fn get_temperature_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {true}
+unsafe extern "C" fn get_temperature_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {
+    true
+}
 
-unsafe extern "C" fn get_humidity_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {true}
+unsafe extern "C" fn get_humidity_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {
+    true
+}
 
 
 enum IncomingMsg {
@@ -98,7 +102,8 @@ struct MeteoTaskCtx<'mb, 'mem: 'mb> {
     rx_msg_queue: RxChannelSpsc<'mb, 'mem, *mut md::message>,
     tx_msg_queue: TxChannelSpsc<'mb, 'mem, *mut md::message>,
     err_msg_queue: TxChannelSpsc<'mb, 'mem, i32>,
-    hum_sensor: bmp085::Bmp085
+    hum_sensor: bmp085::Bmp085,
+    light_sensor: tsl2651::Tsl2561,
 }
 
 static mut METEO_CTX: Option<MeteoTaskCtx> = None;
@@ -163,12 +168,14 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
     let mut hum_sensor = bmp085::Bmp085::new(i2c::Peripheral::I2C3);
     hum_sensor.set_precision(bmp085::Precision::UltraHigh);
 
+    let light_sensor = tsl2651::Tsl2561::new(i2c::Peripheral::I2C3);
 
     METEO_CTX = Some(MeteoTaskCtx {
         rx_msg_queue,
         tx_msg_queue,
         err_msg_queue,
-        hum_sensor
+        hum_sensor,
+        light_sensor,
     });
 
     METEO_CTX.as_ref().unwrap() as *const MeteoTaskCtx as *const CVoid
@@ -180,6 +187,10 @@ pub extern "C" fn rust_meteo_comm_loop(ctx_raw: *mut CVoid) {
     let ctx = unsafe { &mut *(ctx_raw as *mut MeteoTaskCtx) };
 
     if let Ok((_temp, _press)) = ctx.hum_sensor.measure() {
+        tasks::sleep(5000);
+    };
+
+    if let Ok(_light) = ctx.light_sensor.measure() {
         tasks::sleep(5000);
     };
 

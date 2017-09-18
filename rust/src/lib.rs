@@ -30,6 +30,7 @@ extern crate volatile_register;
 
 pub mod bsp;
 
+#[macro_use]
 mod bindings;
 
 #[cfg(feature = "spinner")]

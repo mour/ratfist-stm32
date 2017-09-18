@@ -8,7 +8,6 @@ use mouros_rust_bindings::mailbox;
 use mouros_rust_bindings::mailbox::Mailbox;
 use mouros_rust_bindings::mailbox::{TxChannelSpsc, RxChannelSpsc};
 
-
 use bindings::message_dispatcher as md;
 
 use bsp::i2c;
@@ -18,8 +17,19 @@ use core::ptr;
 
 use core::mem;
 
+use core::slice;
+use core::str;
+
+use core::convert::TryFrom;
+
+
 mod bmp085;
 mod tsl2651;
+
+
+union MessagePayload {
+    channel: u32
+}
 
 
 const GET_TEMPERATURE_MSG_ID: u32 = 0;
@@ -30,13 +40,30 @@ const GET_HUMIDITY_MSG_ID: u32 = 1;
 static mut MESSAGE_ARR: Option<[md::message; 20]> = None;
 static mut MESSAGE_POOL: Option<CriticalLock<Pool<md::message>>> = None;
 
+static mut MESSAGE_PAYLOAD_ARR: Option<[MessagePayload; 20]> = None;
+static mut MESSAGE_PAYLOAD_POOL: Option<CriticalLock<Pool<MessagePayload>>> = None;
 
 unsafe extern "C" fn meteo_alloc(msg_type_id: u32) -> *mut md::message {
-    let pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
+    let msg_pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
+    let payload_pool = MESSAGE_PAYLOAD_POOL.as_ref().expect(
+        "message payload pool not initialized",
+    );
 
     match msg_type_id {
         GET_TEMPERATURE_MSG_ID |
-        GET_HUMIDITY_MSG_ID => pool.lock().take().unwrap_or(&mut *ptr::null_mut()),
+        GET_HUMIDITY_MSG_ID => {
+            let msg = msg_pool.lock().take().and_then(|m| if let Some(payload) =
+                payload_pool.lock().take()
+            {
+                m.data = payload as *mut MessagePayload as *mut CVoid;
+                Some(m)
+            } else {
+                meteo_free(m);
+                None
+            });
+
+            msg.unwrap_or(&mut *ptr::null_mut())
+        }
         _ => ptr::null_mut(),
     }
 }
@@ -46,31 +73,71 @@ unsafe extern "C" fn meteo_free(msg: *mut md::message) {
         return;
     }
 
-    let pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
+    let msg_pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
+    let payload_pool = MESSAGE_PAYLOAD_POOL.as_ref().expect(
+        "message payload pool not initialized",
+    );
 
     match (*msg).msg_type {
         GET_TEMPERATURE_MSG_ID |
-        GET_HUMIDITY_MSG_ID => pool.lock().give(&mut *msg),
+        GET_HUMIDITY_MSG_ID => {
+            if !(*msg).data.is_null() {
+                payload_pool.lock().give(
+                    &mut *((*msg).data as
+                        *mut MessagePayload),
+                );
+            }
+            msg_pool.lock().give(&mut *msg);
+        }
         _ => {}
     }
 }
 
+unsafe fn cstr_ptr_to_str_slice<'a>(cstr_ptr: *mut u8) -> Result<&'a mut str, str::Utf8Error> {
+    let mut len = 0;
+    while *cstr_ptr.offset(len) != b'\0' {
+        len += 1;
+    }
 
-unsafe extern "C" fn get_temperature_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {
+    str::from_utf8_mut(slice::from_raw_parts_mut(cstr_ptr, len as usize))
+}
+
+
+unsafe extern "C" fn get_temperature_parse(msg_ptr: *mut md::message, save_ptr: *mut u8) -> bool {
+    if msg_ptr.is_null() || (*msg_ptr).data.is_null() || save_ptr.is_null() {
+        return false;
+    }
+
+    let payload = unwrap_or_ret_false!(cstr_ptr_to_str_slice(save_ptr));
+    let ch = unwrap_or_ret_false!(payload.parse::<u32>());
+
+    let msg_data = (*msg_ptr).data as *mut MessagePayload;
+    (*msg_data).channel = ch;
+
     true
 }
 
-unsafe extern "C" fn get_humidity_parse(_msg_ptr: *mut md::message, _save_ptr: *mut i8) -> bool {
+unsafe extern "C" fn get_humidity_parse(msg_ptr: *mut md::message, save_ptr: *mut u8) -> bool {
+    if msg_ptr.is_null() || (*msg_ptr).data.is_null() || save_ptr.is_null() {
+        return false;
+    }
+
+    let payload = unwrap_or_ret_false!(cstr_ptr_to_str_slice(save_ptr));
+    let ch = unwrap_or_ret_false!(payload.parse::<u32>());
+
+    let msg_data = (*msg_ptr).data as *mut MessagePayload;
+    (*msg_data).channel = ch;
+
     true
 }
 
 
-enum IncomingMsg {
-    GetTemperature,
-    GetHumidity,
+enum IncomingMsg<'payload> {
+    GetTemperature(&'payload u32),
+    GetHumidity(&'payload u32),
 }
 
-impl md::MemManagement for IncomingMsg {
+impl<'payload> md::MemManagement for IncomingMsg<'payload> {
     fn alloc(msg_type: u32) -> *mut md::message {
         unsafe { meteo_alloc(msg_type) }
     }
@@ -81,6 +148,30 @@ impl md::MemManagement for IncomingMsg {
         }
     }
 }
+
+impl<'payload> TryFrom<*mut md::message> for IncomingMsg<'payload> {
+    type Error = ();
+
+    fn try_from(raw_msg_ptr: *mut md::message) -> Result<Self, Self::Error> {
+        unsafe {
+            if raw_msg_ptr.is_null() || (*raw_msg_ptr).data.is_null() {
+                return Err(());
+            }
+
+            match (*raw_msg_ptr).msg_type {
+                GET_TEMPERATURE_MSG_ID => Ok(IncomingMsg::GetTemperature(
+                    &*((*raw_msg_ptr).data as *const u32),
+                )),
+                GET_HUMIDITY_MSG_ID => Ok(IncomingMsg::GetHumidity(
+                    &*((*raw_msg_ptr).data as *const u32),
+                )),
+                _ => Err(()),
+            }
+        }
+    }
+}
+
+
 
 
 
@@ -127,6 +218,11 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
     MESSAGE_ARR = Some(mem::zeroed());
     MESSAGE_POOL = Some(CriticalLock::new(
         Pool::new(MESSAGE_ARR.as_mut().unwrap().as_mut()),
+    ));
+
+    MESSAGE_PAYLOAD_ARR = Some(mem::zeroed());
+    MESSAGE_PAYLOAD_POOL = Some(CriticalLock::new(
+        Pool::new(MESSAGE_PAYLOAD_ARR.as_mut().unwrap().as_mut()),
     ));
 
     let (rx_msg_queue, _) = mailbox::channel_spsc(RX_QUEUE.as_mut().unwrap());
@@ -181,18 +277,21 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
     METEO_CTX.as_ref().unwrap() as *const MeteoTaskCtx as *const CVoid
 }
 
+use bindings::bsp as bb;
+
 #[no_mangle]
 pub extern "C" fn rust_meteo_comm_loop(ctx_raw: *mut CVoid) {
 
     let ctx = unsafe { &mut *(ctx_raw as *mut MeteoTaskCtx) };
 
-    if let Ok((_temp, _press)) = ctx.hum_sensor.measure() {
-        tasks::sleep(5000);
-    };
+    if let Some(msg_ptr) = ctx.rx_msg_queue.read() {
+        if let Ok(msg) = md::MessageWrapper::try_from(msg_ptr) {
+            match *msg {
+                IncomingMsg::GetTemperature(ch) => bb::led_toggle(bb::BoardLed::LED1),
+                IncomingMsg::GetHumidity(ch) => bb::led_toggle(bb::BoardLed::LED2),
+            }
+        }
+    }
 
-    if let Ok(_light) = ctx.light_sensor.measure() {
-        tasks::sleep(5000);
-    };
-
-    tasks::sleep(1000);
+    tasks::sleep(50);
 }

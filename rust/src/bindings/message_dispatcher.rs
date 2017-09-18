@@ -22,10 +22,10 @@ pub struct message {
 pub struct message_handler {
     pub message_name: *const u8,
     pub parsing_func:
-        Option<unsafe extern "C" fn(msg_ptr: *mut message, save_ptr: *mut i8) -> bool>,
+        Option<unsafe extern "C" fn(msg_ptr: *mut message, save_ptr: *mut u8) -> bool>,
     pub serialization_func: Option<
         unsafe extern "C" fn(msg_ptr: *const message,
-                             output_str: *mut i8,
+                             output_str: *mut u8,
                              output_str_max_len: u32)
                              -> isize,
     >,
@@ -52,7 +52,7 @@ extern "C" {
 
 
 pub struct MessageWrapper<T: Wrappable> {
-    raw_msg_ref: *mut message,
+    raw_msg_ptr: *mut message,
     msg: T,
 }
 
@@ -77,7 +77,7 @@ where
     T: Wrappable,
 {
     fn drop(&mut self) {
-        T::free(self.raw_msg_ref);
+        T::free(self.raw_msg_ptr);
     }
 }
 
@@ -107,7 +107,7 @@ where
     T: Wrappable,
 {
     fn into(self) -> *mut message {
-        let raw_msg_ptr = self.raw_msg_ref;
+        let raw_msg_ptr = self.raw_msg_ptr;
 
         // It's the caller's duty ot deallocate the message now.
         mem::forget(self);
@@ -132,7 +132,7 @@ where
 
         Ok(MessageWrapper {
             msg: T::try_from(raw_msg_ptr)?,
-            raw_msg_ref: raw_msg_ptr,
+            raw_msg_ptr: raw_msg_ptr,
         })
     }
 }
@@ -146,7 +146,7 @@ where
 
         if let Ok(msg_wrapper) = MessageWrapper::try_from(T::alloc(msg_type)) {
             unsafe {
-                (*msg_wrapper.raw_msg_ref).transaction_id = trans_id;
+                (*msg_wrapper.raw_msg_ptr).transaction_id = trans_id;
             }
 
             Ok(msg_wrapper)
@@ -156,7 +156,7 @@ where
     }
 
     pub fn get_transaction_id(&self) -> u32 {
-        unsafe { (*self.raw_msg_ref).transaction_id }
+        unsafe { (*self.raw_msg_ptr).transaction_id }
     }
 }
 
@@ -179,5 +179,16 @@ impl<T> AsRef<T> for SyncMemory<T> {
 impl<T> AsMut<T> for SyncMemory<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.0
+    }
+}
+
+#[macro_export]
+macro_rules! unwrap_or_ret_false {
+    ($wrapped:expr) => {
+        if let Ok(unwrapped) = $wrapped {
+            unwrapped
+        } else {
+            return false;
+        }
     }
 }

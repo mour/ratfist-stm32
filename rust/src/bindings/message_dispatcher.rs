@@ -5,7 +5,7 @@
 
 use core::mem;
 use core::ops::{Deref, DerefMut};
-use core::convert::TryFrom;
+pub use core::convert::TryFrom;
 
 use mouros_rust_bindings::CVoid;
 use mouros_rust_bindings::mailbox::MailboxRaw;
@@ -159,6 +159,102 @@ where
         unsafe { (*self.raw_msg_ptr).transaction_id }
     }
 }
+
+
+
+#[macro_export]
+macro_rules! derive_message_wrapper {
+    ($type_name:tt<$($lifetime:tt),+>, $msg_id:ident => ( $($parsing_expr:tt)+ ), $alloc_func:expr, $free_func:expr) => (
+        derive_message_wrapper!(
+            $type_name<$($lifetime),+>,
+            [$msg_id => ( $($parsing_expr)+ )],
+            $alloc_func, $free_func);
+    );
+
+    ($type_name:tt<$($lifetime:tt),+>, [$( $msg_id:ident => ( $($parsing_expr:tt)+ ) ),+], $alloc_func:expr, $free_func:expr) => (
+        impl<$($lifetime),+> $crate::bindings::message_dispatcher::TryFrom<*mut $crate::bindings::message_dispatcher::message> for $type_name<$($lifetime),+> {
+            derive_message_wrapper!(@try_from_impl
+                $type_name<$($lifetime),+>,
+                [$( $msg_id => ( $($parsing_expr)+ ) ),+]);
+        }
+
+        impl<$($lifetime),+> $crate::bindings::message_dispatcher::MemManagement for $type_name<$($lifetime),+> {
+            derive_message_wrapper!(@mem_mgnt_impl $alloc_func, $free_func);
+        }
+    );
+
+
+    ($type_name:ty, $msg_id:ident => ( $($parsing_expr:tt)+ ), $alloc_func:expr, $free_func:expr) => (
+        derive_message_wrapper!(
+            $type_name,
+            [$msg_id => ( $($parsing_expr)+ )], $alloc_func, $free_func);
+    );
+
+    ($type_name:ty, [$( $msg_id:ident => ( $($parsing_expr:tt)+ ) ),+], $alloc_func:expr, $free_func:expr) => (
+        impl $crate::bindings::message_dispatcher::TryFrom<*mut $crate::bindings::message_dispatcher::message> for $type_name {
+            derive_message_wrapper!(@try_from_impl
+                $type_name,
+                [$($msg_id => ( $($parsing_expr)+ ) ),+]);
+        }
+
+        impl $crate::bindings::message_dispatcher::MemManagement for $type_name {
+            derive_message_wrapper!(@mem_mgnt_impl $alloc_func, $free_func);
+        }
+    );
+
+
+
+    (@try_from_impl $type_name:ty, [$($msg_id:ident => ( $($parsing_expr:tt)+ ) ),+]) => (
+        type Error = ();
+
+        fn try_from(raw_ptr: *mut $crate::bindings::message_dispatcher::message) -> Result<$type_name, Self::Error> {
+            unsafe {
+                if raw_ptr.is_null() {
+                    return Err(());
+                }
+
+                #[allow(unused_variables)]
+                let data_ptr = (*raw_ptr).data;
+
+                match (*raw_ptr).msg_type {
+                    $($msg_id => {derive_message_wrapper!(@match_pattern data_ptr, $($parsing_expr)+ )},)+
+                    _ => Err(())
+                }
+            }
+        }
+    );
+
+    (@match_pattern $_payload_ptr:expr, $type_head:tt$(::$type_tail:tt)* ) => {
+        Ok($type_head$(::$type_tail)*)
+    };
+
+
+    (@match_pattern $payload_ptr:expr, $($parsing_expr:tt)+ ) => {
+        {
+            if $payload_ptr.is_null() {
+                return Err(());
+            }
+
+            derive_message_wrapper!(@as_expr $($parsing_expr)+)($payload_ptr)
+        }
+    };
+
+    (@mem_mgnt_impl $alloc_func:expr, $free_func:expr) => {
+        fn alloc(msg_type: u32) -> *mut $crate::bindings::message_dispatcher::message {
+            #[allow(unused_unsafe)]
+            unsafe { $alloc_func(msg_type) }
+        }
+
+        fn free(msg_ptr: *mut $crate::bindings::message_dispatcher::message) {
+            #[allow(unused_unsafe)]
+            unsafe { $free_func(msg_ptr); }
+        }
+    };
+
+    (@as_expr $e:expr) => {$e};
+}
+
+
 
 
 pub struct SyncMemory<T>(T);

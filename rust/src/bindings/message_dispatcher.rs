@@ -7,6 +7,9 @@ use core::mem;
 use core::ops::{Deref, DerefMut};
 pub use core::convert::TryFrom;
 
+use core::fmt;
+use core::ptr;
+
 use mouros_rust_bindings::CVoid;
 use mouros_rust_bindings::mailbox::MailboxRaw;
 
@@ -286,5 +289,45 @@ macro_rules! unwrap_or_ret_false {
         } else {
             return false;
         }
+    }
+}
+
+pub struct CStrWriter<'buf> {
+    buf: &'buf mut [u8],
+    pos: usize,
+}
+
+impl<'buf> CStrWriter<'buf> {
+    pub fn new(buf: &mut [u8]) -> CStrWriter {
+        buf[0] = '\0' as u8;
+
+        CStrWriter { buf: buf, pos: 0 }
+    }
+
+    pub fn len(&self) -> usize {
+        self.pos
+    }
+}
+
+impl<'buf> fmt::Write for CStrWriter<'buf> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let s_len = s.as_bytes().len();
+
+        if (s_len + 1) > (self.buf.len() - self.pos) {
+            return Err(fmt::Error);
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(
+                s.as_ptr(),
+                self.buf.as_mut_ptr().offset(self.pos as isize),
+                s_len,
+            );
+        }
+
+        self.pos += s_len;
+        self.buf[self.pos] = '\0' as u8;
+
+        Ok(())
     }
 }

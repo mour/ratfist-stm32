@@ -14,16 +14,11 @@ use bindings::message_dispatcher::MemManagement;
 
 use bsp::i2c;
 
-
 use core::ptr;
-
 use core::mem;
-
 use core::slice;
-use core::str;
 
 use core::convert::TryFrom;
-
 use core::fmt::Write;
 
 
@@ -117,16 +112,6 @@ unsafe extern "C" fn meteo_free(msg: *mut md::message) {
     }
 }
 
-unsafe fn cstr_ptr_to_str_slice<'a>(cstr_ptr: *mut u8) -> Result<&'a mut str, str::Utf8Error> {
-    let mut len = 0;
-    while *cstr_ptr.offset(len) != b'\0' {
-        len += 1;
-    }
-
-    str::from_utf8_mut(slice::from_raw_parts_mut(cstr_ptr, len as usize))
-}
-
-
 unsafe extern "C" fn single_channel_num_parse(
     msg_ptr: *mut md::message,
     save_ptr: *mut u8,
@@ -135,7 +120,7 @@ unsafe extern "C" fn single_channel_num_parse(
         return false;
     }
 
-    let payload = unwrap_or_ret_false!(cstr_ptr_to_str_slice(save_ptr));
+    let payload = unwrap_or_ret_false!(md::cstr_ptr_to_str_slice(save_ptr));
     let ch = unwrap_or_ret_false!(payload.parse::<u32>());
 
     let msg_data = (*msg_ptr).data as *mut MessagePayload;

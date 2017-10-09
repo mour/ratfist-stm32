@@ -10,6 +10,9 @@ pub use core::convert::TryFrom;
 use core::fmt;
 use core::ptr;
 
+use core::slice;
+use core::str;
+
 use mouros_rust_bindings::CVoid;
 use mouros_rust_bindings::mailbox::MailboxRaw;
 
@@ -330,4 +333,13 @@ impl<'buf> fmt::Write for CStrWriter<'buf> {
 
         Ok(())
     }
+}
+
+pub unsafe fn cstr_ptr_to_str_slice<'a>(cstr_ptr: *mut u8) -> Result<&'a mut str, str::Utf8Error> {
+    let mut len = 0;
+    while *cstr_ptr.offset(len) != b'\0' {
+        len += 1;
+    }
+
+    str::from_utf8_mut(slice::from_raw_parts_mut(cstr_ptr, len as usize))
 }

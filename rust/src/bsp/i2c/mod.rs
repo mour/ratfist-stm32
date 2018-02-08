@@ -4,7 +4,7 @@ mod i2c_v1;
 #[cfg(feature = "stm32f411discovery")]
 use self::i2c_v1 as i2c_impl;
 
-pub use self::i2c_impl::rust_i2c_interrupt_handler;
+pub use self::i2c_impl::{rust_i2c_interrupt_handler, rust_i2c_interrupt_error_handler};
 pub use self::i2c_impl::peripheral_init;
 
 use core::mem;
@@ -115,6 +115,7 @@ impl<'a, 'b> Peripheral {
                             if ret_val == 0 {
                                 return Ok(());
                             } else {
+                                i2c_impl::deblock_bus(ctx.periph_id);
                                 return Err(());
                             }
                         }

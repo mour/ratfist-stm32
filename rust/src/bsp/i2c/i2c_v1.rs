@@ -64,6 +64,7 @@ use bsp::gpio;
 use bsp::rcc;
 use bsp::nvic;
 
+use mouros_rust_bindings::tasks;
 
 use volatile_register::{RW, RO};
 
@@ -94,8 +95,8 @@ pub fn peripheral_init(periph: Peripheral) {
         Peripheral::I2C1 => {
             rcc::enable_periph(rcc::Peripheral::GpioB);
 
-            let scl = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin6);
             let sda = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin9);
+            let scl = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin6);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
             sda.set_mode(gpio::Mode::AlternateFunction(
@@ -113,13 +114,18 @@ pub fn peripheral_init(periph: Peripheral) {
 
             rcc::enable_periph(rcc::Peripheral::I2C1);
             nvic::enable_interrupt(nvic::Interrupt::I2C1Ev);
-            nvic::set_priority(nvic::Interrupt::I2C1Ev, 0);
+            nvic::set_priority(nvic::Interrupt::I2C1Ev, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C1Ev, 1);
+
+            nvic::enable_interrupt(nvic::Interrupt::I2C1Er);
+            nvic::set_priority(nvic::Interrupt::I2C1Er, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C1Er, 0);
         }
         Peripheral::I2C2 => {
             rcc::enable_periph(rcc::Peripheral::GpioB);
 
-            let scl = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin10);
             let sda = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin3);
+            let scl = gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin10);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
             sda.set_mode(gpio::Mode::AlternateFunction(
@@ -137,14 +143,19 @@ pub fn peripheral_init(periph: Peripheral) {
 
             rcc::enable_periph(rcc::Peripheral::I2C2);
             nvic::enable_interrupt(nvic::Interrupt::I2C2Ev);
-            nvic::set_priority(nvic::Interrupt::I2C2Ev, 0);
+            nvic::set_priority(nvic::Interrupt::I2C2Ev, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C2Ev, 1);
+
+            nvic::enable_interrupt(nvic::Interrupt::I2C2Er);
+            nvic::set_priority(nvic::Interrupt::I2C2Er, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C2Er, 0);
         }
         Peripheral::I2C3 => {
             rcc::enable_periph(rcc::Peripheral::GpioA);
             rcc::enable_periph(rcc::Peripheral::GpioC);
 
-            let scl = gpio::Pin::new(gpio::Gpio::GpioA, gpio::PinNum::Pin8);
             let sda = gpio::Pin::new(gpio::Gpio::GpioC, gpio::PinNum::Pin9);
+            let scl = gpio::Pin::new(gpio::Gpio::GpioA, gpio::PinNum::Pin8);
 
             sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
             sda.set_mode(gpio::Mode::AlternateFunction(
@@ -162,7 +173,12 @@ pub fn peripheral_init(periph: Peripheral) {
 
             rcc::enable_periph(rcc::Peripheral::I2C3);
             nvic::enable_interrupt(nvic::Interrupt::I2C3Ev);
-            nvic::set_priority(nvic::Interrupt::I2C3Ev, 0);
+            nvic::set_priority(nvic::Interrupt::I2C3Ev, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C3Ev, 1);
+
+            nvic::enable_interrupt(nvic::Interrupt::I2C3Er);
+            nvic::set_priority(nvic::Interrupt::I2C3Er, 1);
+            nvic::set_subpriority(nvic::Interrupt::I2C3Er, 0);
         }
     }
 
@@ -170,10 +186,62 @@ pub fn peripheral_init(periph: Peripheral) {
 
     i2c.set_100mhz_standard_mode(48000000);
     i2c.enable_event_interrupts();
+    i2c.enable_error_interrupts();
     i2c.set_analog_filter_state(true);
     i2c.set_digital_filter_len(0x0f);
 
     i2c.enable_periph();
+}
+
+pub fn deblock_bus(periph: Peripheral) {
+    let i2c = I2C::get_periph(periph);
+    i2c.reset();
+
+    let (sda, scl) = match periph {
+        Peripheral::I2C1 => {
+            (
+                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin9),
+                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin6),
+            )
+        }
+        Peripheral::I2C2 => {
+            (
+                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin3),
+                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin10),
+            )
+        }
+        Peripheral::I2C3 => {
+            (
+                gpio::Pin::new(gpio::Gpio::GpioC, gpio::PinNum::Pin9),
+                gpio::Pin::new(gpio::Gpio::GpioA, gpio::PinNum::Pin8),
+            )
+        }
+    };
+
+    sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
+    sda.set_mode(gpio::Mode::Output(
+        gpio::OutputType::OpenDrain,
+        gpio::OutputSpeed::High,
+    ));
+
+    scl.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
+    scl.set_mode(gpio::Mode::Output(
+        gpio::OutputType::OpenDrain,
+        gpio::OutputSpeed::High,
+    ));
+
+    // Generate nine clock pulses while SDA is high.
+    // The pulses should be at 100kHz -> 5us high, 5us low. The wait_us function seems to have about a 3us overhead.
+    sda.set();
+    for _ in 0..9 {
+        scl.set();
+        tasks::wait_us(2);
+        scl.reset();
+        tasks::wait_us(2);
+    }
+    scl.set();
+
+    peripheral_init(periph);
 }
 
 impl I2C {
@@ -188,6 +256,8 @@ impl I2C {
 
     pub fn reset(&self) {
         unsafe {
+            self.clear_transaction_ctrl_bits();
+
             let cr1 = self.cr1.read();
             let cr2 = self.cr2.read();
             let oar1 = self.oar1.read();
@@ -206,6 +276,21 @@ impl I2C {
             self.trise.write(trise);
             self.fltr.write(fltr);
             self.cr1.write(cr1);
+        }
+    }
+
+    fn clear_error_flags(&self) {
+        // BERR - bus error - misplaced start or stop bit - Cleared by writing 0.
+        // ARLO - arbitration lost - cleared by writing 0.
+        // AF - acknowledge failure - set when no ACK received. Cleared by writing 0.
+        unsafe {
+            self.sr1.modify(|curr| curr & (!I2C_SR1_BERR & !I2C_SR1_ARLO & !I2C_SR1_AF));
+        }
+    }
+
+    fn clear_transaction_ctrl_bits(&self) {
+        unsafe {
+            self.cr1.modify(|curr| curr & (!I2C_CR1_POS & !I2C_CR1_ACK & !I2C_CR1_STOP & !I2C_CR1_START));
         }
     }
 
@@ -289,6 +374,12 @@ impl I2C {
     fn enable_event_interrupts(&self) {
         unsafe {
             self.cr2.modify(|curr| curr | I2C_CR2_ITEVTEN);
+        }
+    }
+
+    fn enable_error_interrupts(&self) {
+        unsafe {
+            self.cr2.modify(|curr| curr | I2C_CR2_ITERREN);
         }
     }
 
@@ -422,8 +513,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                         periph.send_stop();
                         ctx.state = PeripheralState::Done(0);
                     } else {
-                        periph.reset();
-
                         periph.send_start();
                         trans.curr_step += 1;
                         ctx.state = PeripheralState::StartBitSet;
@@ -495,6 +584,17 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn rust_i2c_interrupt_error_handler(ctx_id: usize) {
+    let ctx = unsafe { &mut I2C_PERIPHS[ctx_id] };
+
+    let periph: &I2C = I2C::get_periph(ctx.periph_id);
+
+    periph.clear_error_flags();
+    periph.clear_transaction_ctrl_bits();
+
+    ctx.state = PeripheralState::Done(-1);
+}
 
 pub static mut I2C_PERIPHS: [InterruptContext; 3] = [
     InterruptContext {

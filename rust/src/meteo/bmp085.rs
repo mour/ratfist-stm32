@@ -75,7 +75,7 @@ impl Bmp085 {
                 i2c::Step::Write(&mut set_addr),
                 i2c::Step::Read(&mut conf_data),
             ],
-        );
+        )?;
 
         self.calib = Some(CalibrationData {
             ac1: ((conf_data[0] as u16) << 8 | conf_data[1] as u16) as i16 as i32,
@@ -95,7 +95,7 @@ impl Bmp085 {
     }
 
 
-    fn get_raw_temp_val(&self) -> i32 {
+    fn get_raw_temp_val(&self) -> Result<i32, ()> {
         let mut t_meas_cmd = [0xf4, 0x2e];
         let mut t_data_addr = [0xf6];
         let mut t_data_buf = [0; 2];
@@ -103,7 +103,7 @@ impl Bmp085 {
         self.i2c_bus.run_transaction(
             self.dev_addr,
             &mut [i2c::Step::Write(&mut t_meas_cmd)],
-        );
+        )?;
 
         tasks::sleep(5);
 
@@ -113,13 +113,13 @@ impl Bmp085 {
                 i2c::Step::Write(&mut t_data_addr),
                 i2c::Step::Read(&mut t_data_buf),
             ],
-        );
+        )?;
 
-        (((t_data_buf[0] as u32) << 8) | t_data_buf[1] as u32) as i32
+        Ok((((t_data_buf[0] as u32) << 8) | t_data_buf[1] as u32) as i32)
     }
 
 
-    fn get_raw_pressure_val(&self) -> i32 {
+    fn get_raw_pressure_val(&self) -> Result<i32, ()> {
         let oss = self.precision.get_oversampling_param();
 
         let mut p_meas_cmd = [0xf4, (0x34 + (oss << 6)) as u8];
@@ -129,7 +129,7 @@ impl Bmp085 {
         self.i2c_bus.run_transaction(
             self.dev_addr,
             &mut [i2c::Step::Write(&mut p_meas_cmd)],
-        );
+        )?;
 
         tasks::sleep(self.precision.get_pressure_conversion_time_ms());
 
@@ -139,10 +139,9 @@ impl Bmp085 {
                 i2c::Step::Write(&mut p_data_addr),
                 i2c::Step::Read(&mut p_data_buf),
             ],
-        );
+        )?;
 
-        (((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32) >>
-             (8 - oss)) as i32
+        Ok((((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32) >> (8 - oss)) as i32)
     }
 
     pub fn set_precision(&mut self, precision: Precision) {
@@ -157,8 +156,8 @@ impl Bmp085 {
 
         let calib = self.calib.as_ref().ok_or(())?;
 
-        let ut = self.get_raw_temp_val();
-        let up = self.get_raw_pressure_val();
+        let ut = self.get_raw_temp_val()?;
+        let up = self.get_raw_pressure_val()?;
 
 
         let x1: i32 = (ut - calib.ac6) * calib.ac5 >> 15;

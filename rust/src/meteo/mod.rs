@@ -35,10 +35,12 @@ union MessagePayload {
 const GET_TEMPERATURE_MSG_ID: u32 = 0;
 const GET_PRESSURE_MSG_ID: u32 = 1;
 const GET_HUMIDITY_MSG_ID: u32 = 2;
+const GET_LIGHT_LEVEL_MSG_ID: u32 = 3;
 
-const TEMPERATURE_REPLY_MSG_ID: u32 = 3;
-const PRESSURE_REPLY_MSG_ID: u32 = 4;
-const HUMIDITY_REPLY_MSG_ID: u32 = 5;
+const TEMPERATURE_REPLY_MSG_ID: u32 = 4;
+const PRESSURE_REPLY_MSG_ID: u32 = 5;
+const HUMIDITY_REPLY_MSG_ID: u32 = 6;
+const LIGHT_LEVEL_REPLY_MSG_ID: u32 = 7;
 
 
 static mut MESSAGE_ARR: Option<[md::message; 20]> = None;
@@ -57,17 +59,17 @@ unsafe extern "C" fn meteo_alloc(msg_type_id: u32) -> *mut md::message {
         GET_TEMPERATURE_MSG_ID |
         GET_PRESSURE_MSG_ID |
         GET_HUMIDITY_MSG_ID |
+        GET_LIGHT_LEVEL_MSG_ID |
         TEMPERATURE_REPLY_MSG_ID |
         PRESSURE_REPLY_MSG_ID |
-        HUMIDITY_REPLY_MSG_ID => {
-            msg_pool
-                .lock()
-                .take()
-                .and_then(|mut m| if let Some(mut payload) =
+        HUMIDITY_REPLY_MSG_ID |
+        LIGHT_LEVEL_REPLY_MSG_ID => {
+            let m = msg_pool.lock().take().and_then(
+                |mut m| if let Some(mut payload) =
                     payload_pool.lock().take()
                 {
-                    m = mem::zeroed();
-                    payload = mem::zeroed();
+                    *m = mem::zeroed();
+                    *payload = mem::zeroed();
 
                     m.msg_type = msg_type_id;
                     m.data = payload as *mut MessagePayload as *mut CVoid;
@@ -76,8 +78,10 @@ unsafe extern "C" fn meteo_alloc(msg_type_id: u32) -> *mut md::message {
                 } else {
                     meteo_free(m);
                     None
-                })
-                .unwrap_or(&mut *ptr::null_mut())
+                },
+            );
+
+            m.unwrap_or(&mut *ptr::null_mut())
         }
         _ => ptr::null_mut(),
     }
@@ -97,9 +101,11 @@ unsafe extern "C" fn meteo_free(msg: *mut md::message) {
         GET_TEMPERATURE_MSG_ID |
         GET_PRESSURE_MSG_ID |
         GET_HUMIDITY_MSG_ID |
+        GET_LIGHT_LEVEL_MSG_ID |
         TEMPERATURE_REPLY_MSG_ID |
         PRESSURE_REPLY_MSG_ID |
-        HUMIDITY_REPLY_MSG_ID => {
+        HUMIDITY_REPLY_MSG_ID |
+        LIGHT_LEVEL_REPLY_MSG_ID => {
             if !(*msg).data.is_null() {
                 payload_pool.lock().give(
                     &mut *((*msg).data as
@@ -142,7 +148,7 @@ unsafe extern "C" fn single_floating_value_serialize(
     let buf = slice::from_raw_parts_mut(output_str, output_str_max_len as usize);
     let mut w = md::CStrWriter::new(buf);
 
-    if write!(w, "{}", *((*msg_ptr).data as *const f32)).is_ok() {
+    if write!(w, ",{}", *((*msg_ptr).data as *const f32)).is_ok() {
         w.len() as isize
     } else {
         -1
@@ -155,6 +161,7 @@ enum IncomingMsg<'payload> {
     GetTemperature(&'payload u32),
     GetPressure(&'payload u32),
     GetHumidity(&'payload u32),
+    GetLightLevel(&'payload u32),
 }
 
 derive_message_wrapper!(IncomingMsg<'payload>, [
@@ -166,6 +173,9 @@ derive_message_wrapper!(IncomingMsg<'payload>, [
     }),
     GET_HUMIDITY_MSG_ID => (|payload_ptr| {
         Ok(IncomingMsg::GetHumidity(&*(payload_ptr as *const u32)))
+    }),
+    GET_LIGHT_LEVEL_MSG_ID => (|payload_ptr| {
+        Ok(IncomingMsg::GetLightLevel(&*(payload_ptr as *const u32)))
     })],
     meteo_alloc,
     meteo_free);
@@ -194,6 +204,13 @@ derive_message_wrapper!(HumidityReply<'payload>,
     meteo_alloc,
     meteo_free);
 
+struct LightLevelReply<'payload>(&'payload mut f32);
+
+derive_message_wrapper!(LightLevelReply<'payload>,
+    LIGHT_LEVEL_REPLY_MSG_ID => (|payload_ptr| Ok(LightLevelReply(&mut *(payload_ptr as *mut f32)))),
+    meteo_alloc,
+    meteo_free);
+
 
 static mut RX_QUEUE_ARR: Option<[*mut md::message; 20]> = None;
 static mut RX_QUEUE: Option<Mailbox<*mut md::message>> = None;
@@ -204,7 +221,7 @@ static mut TX_QUEUE: Option<Mailbox<*mut md::message>> = None;
 static mut ERR_QUEUE_ARR: Option<[i32; 20]> = None;
 static mut ERR_QUEUE: Option<Mailbox<i32>> = None;
 
-static mut MSG_HANDLERS: Option<[md::message_handler; 6]> = None;
+static mut MSG_HANDLERS: Option<[md::message_handler; 8]> = None;
 static mut MSG_CONF: Option<md::subsystem_message_conf> = None;
 
 
@@ -287,6 +304,11 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
                 serialization_func: None,
             },
             md::message_handler {
+                message_name: b"GET_LIGHT_LEVEL\0" as *const u8,
+                parsing_func: Some(single_channel_num_parse),
+                serialization_func: None,
+            },
+            md::message_handler {
                 message_name: b"TEMPERATURE_REPLY\0" as *const u8,
                 parsing_func: None,
                 serialization_func: Some(single_floating_value_serialize),
@@ -298,6 +320,11 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
             },
             md::message_handler {
                 message_name: b"HUMIDITY_REPLY\0" as *const u8,
+                parsing_func: None,
+                serialization_func: Some(single_floating_value_serialize),
+            },
+            md::message_handler {
+                message_name: b"LIGHT_LEVEL_REPLY\0" as *const u8,
                 parsing_func: None,
                 serialization_func: Some(single_floating_value_serialize),
             },
@@ -362,13 +389,23 @@ fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
                     })
             });
         }
-        IncomingMsg::GetHumidity(ch) => {
+        IncomingMsg::GetHumidity(_ch) => {
             md::MessageWrapper::new(msg.get_transaction_id(), HUMIDITY_REPLY_MSG_ID)
                 .and_then(|mut reply: md::MessageWrapper<HumidityReply>| {
                     *reply.0 = 0.0;
 
                     ctx.send_msg(reply)
                 });
+        }
+        IncomingMsg::GetLightLevel(_ch) => {
+            ctx.light_sensor.measure().and_then(|level| {
+                md::MessageWrapper::new(msg.get_transaction_id(), LIGHT_LEVEL_REPLY_MSG_ID)
+                    .and_then(|mut reply: md::MessageWrapper<LightLevelReply>| {
+                        *reply.0 = level;
+
+                        ctx.send_msg(reply)
+                    })
+            });
         }
     }
 }

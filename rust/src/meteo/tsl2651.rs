@@ -1,12 +1,12 @@
 
 use bsp::i2c;
 
-const TSL2561_I2C_ADDR: u8 = 0xaa;
+const TSL2561_I2C_ADDR: u8 = 0x29;
 
 const CONTROL_REG_ADDR: u8 = 0x00 | 0x80 | 0x10;
 const TIMING_REG_ADDR: u8 = 0x01 | 0x80 | 0x10;
-const DATA_REG_ADDR: u8 = 0x0c | 0x80 | 0x10;
-const DATA_BYTE_NUM: usize = 4;
+const DATA_REG_ADDR: u8 = 0x0b | 0x80 | 0x10;
+const DATA_BYTE_NUM: usize = 5;
 
 
 #[derive(Clone, Copy)]
@@ -71,7 +71,7 @@ impl Tsl2561 {
     }
 
     pub fn set_state(&mut self, new_state: State) -> Result<(), ()> {
-        let mut state_cmd = [CONTROL_REG_ADDR, new_state as u8];
+        let mut state_cmd = [CONTROL_REG_ADDR, 0x01, new_state as u8];
 
         self.i2c_bus
             .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut state_cmd)])
@@ -86,7 +86,7 @@ impl Tsl2561 {
         new_gain: Gain,
         new_integ_time: IntegrationTime,
     ) -> Result<(), ()> {
-        let mut g_it_cmd = [TIMING_REG_ADDR, (new_gain as u8) | (new_integ_time as u8)];
+        let mut g_it_cmd = [TIMING_REG_ADDR, 0x01, (new_gain as u8) | (new_integ_time as u8)];
 
         self.i2c_bus
             .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut g_it_cmd)])
@@ -111,8 +111,8 @@ impl Tsl2561 {
 
         res.map(|_| {
             (
-                ((data_buf[1] as u16) << 8) | (data_buf[0] as u16),
-                ((data_buf[3] as u16) << 8) | (data_buf[2] as u16),
+                ((data_buf[2] as u16) << 8) | (data_buf[1] as u16),
+                ((data_buf[4] as u16) << 8) | (data_buf[3] as u16),
             )
         })
     }

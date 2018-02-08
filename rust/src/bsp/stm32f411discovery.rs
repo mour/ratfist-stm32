@@ -12,10 +12,14 @@ pub mod periph_base_addr {
     pub const GPIOH: usize = 0x40021C00;
     pub const RCC: usize = 0x40023800;
     pub const NVIC: usize = 0xE000E100;
+    pub const SCB: usize = 0xE000E008;
 }
 
 pub mod nvic {
     use volatile_register::{RW, RO, WO};
+    use super::scb;
+
+    const NVIC_IPR_PRIO_OFFSET: u8 = 4;
 
     struct Nvic {
         iser: [RW<u32>; 3],
@@ -121,8 +125,106 @@ pub mod nvic {
     pub fn set_priority(int: Interrupt, prio: u8) {
         let nvic = unsafe { &*(super::periph_base_addr::NVIC as *const Nvic) };
 
+        let bp_offset = get_prio_grouping_binpoint_offset(scb::get_priority_grouping());
+        let prio_mask = 0xff << bp_offset << NVIC_IPR_PRIO_OFFSET;
+
         unsafe {
-            nvic.ipr[int as usize].write(prio);
+            nvic.ipr[int as usize].modify(|curr| {
+                (curr & !prio_mask) | ((prio << bp_offset) << NVIC_IPR_PRIO_OFFSET)
+            });
+        }
+    }
+
+    pub fn set_subpriority(int: Interrupt, subprio: u8) {
+        let nvic = unsafe { &*(super::periph_base_addr::NVIC as *const Nvic) };
+
+        let bp_offset = get_prio_grouping_binpoint_offset(scb::get_priority_grouping());
+        let prio_mask = 0xff << bp_offset << NVIC_IPR_PRIO_OFFSET;
+
+        let subprio_shifted_masked = (subprio << NVIC_IPR_PRIO_OFFSET) & !prio_mask;
+
+        unsafe {
+            nvic.ipr[int as usize].modify(|curr| {
+                (curr & prio_mask) | subprio_shifted_masked
+            });
+        }
+    }
+
+    fn get_prio_grouping_binpoint_offset(grouping: scb::ItPriorityGrouping) -> u8 {
+        match grouping {
+            scb::ItPriorityGrouping::SixteenNone => 0,
+            scb::ItPriorityGrouping::EightTwo => 1,
+            scb::ItPriorityGrouping::FourFour => 2,
+            scb::ItPriorityGrouping::TwoFour => 3,
+            scb::ItPriorityGrouping::NoneSixteen => 4,
+        }
+    }
+}
+
+pub mod scb {
+    use volatile_register::{RW, RO};
+    use core::mem;
+
+    const SCB_AIRCR_VECTKEY: u32 = 0x05fa0000;
+    const SCB_AIRCR_VECTKEY_MASK: u32 = 0xffff0000;
+    const SCB_AIRCR_PRIGROUP_OFFSET: u32 = 8;
+    const SCB_AIRCR_PRIGROUP_MASK: u32 = 0x00000700;
+
+    #[repr(C)]
+    struct Scb {
+        _actlr: RW<u32>,
+        _padding1: [u8; 0xcf4],
+        _cpuid: RO<u32>,
+        _icsr: RW<u32>,
+        _vtor: RW<u32>,
+        aircr: RW<u32>,
+        _scr: RW<u32>,
+        _ccr: RW<u32>,
+        _shpr1: RW<u32>,
+        _shpr2: RW<u32>,
+        _shpr3: RW<u32>,
+        _shcrs: RW<u32>,
+        _cfsr: RW<u32>,
+        _hfsr: RW<u32>,
+        _padding2: [u8; 4],
+        _mmar: RW<u32>,
+        _bfar: RW<u32>,
+        _afsr: RW<u32>,
+    }
+
+    #[repr(u32)]
+    #[derive(Copy, Clone)]
+    pub enum ItPriorityGrouping {
+        SixteenNone = 0b000,
+        EightTwo = 0b100,
+        FourFour = 0b101,
+        TwoFour = 0b110,
+        NoneSixteen = 0b111,
+    }
+
+
+    pub fn set_priority_grouping(grouping: ItPriorityGrouping) {
+        let scb = unsafe { &*(super::periph_base_addr::SCB as *const Scb) };
+
+        unsafe {
+            scb.aircr.modify(|curr| {
+                (curr & !SCB_AIRCR_VECTKEY_MASK) |
+                SCB_AIRCR_VECTKEY |
+                ((grouping as u32) << SCB_AIRCR_PRIGROUP_OFFSET)
+            });
+        }
+    }
+
+    pub fn get_priority_grouping() -> ItPriorityGrouping {
+        let scb = unsafe { &*(super::periph_base_addr::SCB as *const Scb) };
+
+        let val = (scb.aircr.read() & SCB_AIRCR_PRIGROUP_MASK) >> SCB_AIRCR_PRIGROUP_OFFSET;
+
+        // Any combination of bits where they're 0b0xx means sixteen priorities, and zero subpriorities.
+        if val & 0b100 == 0 {
+            ItPriorityGrouping::SixteenNone
+        } else {
+            unsafe { mem::transmute(val) }
         }
     }
 }
@@ -380,4 +482,6 @@ pub mod rcc {
 
 
 
-pub fn board_specific_init() {}
+pub fn board_specific_init() {
+    scb::set_priority_grouping(scb::ItPriorityGrouping::EightTwo);
+}

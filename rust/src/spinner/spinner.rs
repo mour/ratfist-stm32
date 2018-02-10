@@ -1,7 +1,7 @@
 
-use mouros_rust_bindings::mailbox::Mailbox;
-use mouros_rust_bindings::CVoid;
-use mouros_rust_bindings::tasks;
+use mouros::mailbox::Mailbox;
+use mouros::CVoid;
+use mouros::tasks;
 
 use bindings::constants;
 use bindings::message_dispatcher;

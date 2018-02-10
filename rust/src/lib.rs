@@ -24,7 +24,7 @@ macro_rules! __as_expr {
 
 
 #[macro_use]
-extern crate mouros_rust_bindings;
+extern crate mouros;
 
 extern crate volatile_register;
 

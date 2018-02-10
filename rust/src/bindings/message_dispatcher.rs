@@ -13,8 +13,8 @@ use core::ptr;
 use core::slice;
 use core::str;
 
-use mouros_rust_bindings::CVoid;
-use mouros_rust_bindings::mailbox::MailboxRaw;
+use mouros::CVoid;
+use mouros::mailbox::MailboxRaw;
 
 #[repr(C)]
 pub struct message {

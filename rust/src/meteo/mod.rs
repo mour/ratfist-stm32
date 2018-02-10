@@ -1,13 +1,13 @@
 
-use mouros_rust_bindings::CVoid;
-use mouros_rust_bindings::tasks;
-use mouros_rust_bindings::tasks::CriticalLock;
-use mouros_rust_bindings::pool_alloc::Pool;
+use mouros::CVoid;
+use mouros::tasks;
+use mouros::tasks::CriticalLock;
+use mouros::pool_alloc::Pool;
 
-use mouros_rust_bindings::mailbox;
-use mouros_rust_bindings::mailbox::Mailbox;
-use mouros_rust_bindings::mailbox::{TxChannelSpsc, RxChannelSpsc};
-use mouros_rust_bindings::mailbox::{SendError, RecvError};
+use mouros::mailbox;
+use mouros::mailbox::Mailbox;
+use mouros::mailbox::{TxChannelSpsc, RxChannelSpsc};
+use mouros::mailbox::{SendError, RecvError};
 
 use bindings::message_dispatcher as md;
 use bindings::message_dispatcher::MemManagement;

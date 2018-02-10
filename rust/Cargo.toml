@@ -25,5 +25,5 @@ stm32f072discovery = []
 [dependencies]
 volatile-register = "0.2"
 
-[dependencies.mouros-rust-bindings]
+[dependencies.mouros]
 path = "../libsrc/mouros/rust"

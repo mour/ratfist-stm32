@@ -64,7 +64,7 @@ use bsp::gpio;
 use bsp::rcc;
 use bsp::nvic;
 
-use mouros_rust_bindings::tasks;
+use mouros::tasks;
 
 use volatile_register::{RW, RO};
 

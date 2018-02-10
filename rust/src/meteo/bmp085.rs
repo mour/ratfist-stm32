@@ -1,7 +1,7 @@
 
 use bsp::i2c;
 
-use mouros_rust_bindings::tasks;
+use mouros::tasks;
 
 const BMP085_I2C_ADDR: u8 = 0x77;
 

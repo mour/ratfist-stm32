@@ -1,5 +1,7 @@
 use bsp::i2c;
 
+use super::MeteoError;
+
 const TSL2561_I2C_ADDR: u8 = 0x29;
 
 const CONTROL_REG_ADDR: u8 = 0x00 | 0x80 | 0x10;
@@ -7,7 +9,7 @@ const TIMING_REG_ADDR: u8 = 0x01 | 0x80 | 0x10;
 const DATA_REG_ADDR: u8 = 0x0b | 0x80 | 0x10;
 const DATA_BYTE_NUM: usize = 5;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum State {
     On = 0x03,
@@ -68,11 +70,12 @@ impl Tsl2561 {
         }
     }
 
-    pub fn set_state(&mut self, new_state: State) -> Result<(), ()> {
+    pub fn set_state(&mut self, new_state: State) -> Result<(), MeteoError> {
         let mut state_cmd = [CONTROL_REG_ADDR, 0x01, new_state as u8];
 
         self.i2c_bus
             .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut state_cmd)])
+            .map_err(|_| MeteoError::I2CCommError)
             .and_then(|_| {
                 self.state = new_state;
                 Ok(())
@@ -83,7 +86,7 @@ impl Tsl2561 {
         &mut self,
         new_gain: Gain,
         new_integ_time: IntegrationTime,
-    ) -> Result<(), ()> {
+    ) -> Result<(), MeteoError> {
         let mut g_it_cmd = [
             TIMING_REG_ADDR,
             0x01,
@@ -92,6 +95,7 @@ impl Tsl2561 {
 
         self.i2c_bus
             .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut g_it_cmd)])
+            .map_err(|_| MeteoError::I2CCommError)
             .and_then(|_| {
                 self.gain = new_gain;
                 self.integ_time = new_integ_time;
@@ -99,7 +103,7 @@ impl Tsl2561 {
             })
     }
 
-    fn get_raw_data(&self) -> Result<(u16, u16), ()> {
+    fn get_raw_data(&self) -> Result<(u16, u16), MeteoError> {
         let mut data_addr_cmd = [DATA_REG_ADDR];
         let mut data_buf = [0; DATA_BYTE_NUM];
 
@@ -116,10 +120,14 @@ impl Tsl2561 {
                 ((data_buf[2] as u16) << 8) | (data_buf[1] as u16),
                 ((data_buf[4] as u16) << 8) | (data_buf[3] as u16),
             )
-        })
+        }).map_err(|_| MeteoError::I2CCommError)
     }
 
-    pub fn measure(&mut self) -> Result<f32, ()> {
+    pub fn measure(&mut self) -> Result<f32, MeteoError> {
+        if self.state == State::Off {
+            return Err(MeteoError::SensorNotReadyError);
+        }
+
         let (raw_ch0, raw_ch1) = self.get_raw_data()?;
         if raw_ch0 == 0 {
             return Ok(0.0);
@@ -140,7 +148,7 @@ impl Tsl2561 {
             x if 0.61 <= x && x < 0.80 => Ok(0.0128 * ch0 - 0.0153 * ch1),
             x if 0.80 <= x && x < 1.30 => Ok(0.00146 * ch0 - 0.00112 * ch1),
             x if 1.30 <= x => Ok(0.0),
-            _ => Err(()),
+            _ => Err(MeteoError::InvalidSensorData),
         }
     }
 }

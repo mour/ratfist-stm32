@@ -43,12 +43,14 @@ const HUMIDITY_REPLY_MSG_ID: u32 = 6;
 const LIGHT_LEVEL_REPLY_MSG_ID: u32 = 7;
 
 #[repr(i32)]
-#[derive(Copy, Clone)]
-enum MeteoError {
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum MeteoError {
     I2CCommError = -1,
     TxQueueFullError = -2,
     InvalidMsgError = -3,
     MsgCreationError = -4,
+    SensorNotReadyError = -5,
+    InvalidSensorData = -6,
 }
 
 static mut MESSAGE_ARR: Option<[md::message; 20]> = None;
@@ -365,32 +367,26 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
 
 fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
     let res = match *msg {
-        IncomingMsg::GetTemperature(ch) => ctx.press_sensor
-            .measure()
-            .map_err(|_| MeteoError::I2CCommError)
-            .and_then(|(t, _)| {
-                md::MessageWrapper::new(msg.get_transaction_id(), TEMPERATURE_REPLY_MSG_ID)
-                    .map_err(|_| MeteoError::MsgCreationError)
-                    .and_then(|mut reply: md::MessageWrapper<TemperatureReply>| {
-                        *reply.0 = *ch;
-                        *reply.1 = t;
+        IncomingMsg::GetTemperature(ch) => ctx.press_sensor.measure().and_then(|(t, _)| {
+            md::MessageWrapper::new(msg.get_transaction_id(), TEMPERATURE_REPLY_MSG_ID)
+                .map_err(|_| MeteoError::MsgCreationError)
+                .and_then(|mut reply: md::MessageWrapper<TemperatureReply>| {
+                    *reply.0 = *ch;
+                    *reply.1 = t;
 
-                        ctx.send_msg(reply)
-                    })
-            }),
-        IncomingMsg::GetPressure(ch) => ctx.press_sensor
-            .measure()
-            .map_err(|_| MeteoError::I2CCommError)
-            .and_then(|(_, p)| {
-                md::MessageWrapper::new(msg.get_transaction_id(), PRESSURE_REPLY_MSG_ID)
-                    .map_err(|_| MeteoError::MsgCreationError)
-                    .and_then(|mut reply: md::MessageWrapper<PressureReply>| {
-                        *reply.0 = *ch;
-                        *reply.1 = p;
+                    ctx.send_msg(reply)
+                })
+        }),
+        IncomingMsg::GetPressure(ch) => ctx.press_sensor.measure().and_then(|(_, p)| {
+            md::MessageWrapper::new(msg.get_transaction_id(), PRESSURE_REPLY_MSG_ID)
+                .map_err(|_| MeteoError::MsgCreationError)
+                .and_then(|mut reply: md::MessageWrapper<PressureReply>| {
+                    *reply.0 = *ch;
+                    *reply.1 = p;
 
-                        ctx.send_msg(reply)
-                    })
-            }),
+                    ctx.send_msg(reply)
+                })
+        }),
         IncomingMsg::GetHumidity(ch) => {
             md::MessageWrapper::new(msg.get_transaction_id(), HUMIDITY_REPLY_MSG_ID)
                 .map_err(|_| MeteoError::MsgCreationError)
@@ -403,7 +399,6 @@ fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
         }
         IncomingMsg::GetLightLevel(ch) => ctx.light_sensor
             .measure()
-            .map_err(|_| MeteoError::I2CCommError)
             .and_then(|level| {
                 md::MessageWrapper::new(msg.get_transaction_id(), LIGHT_LEVEL_REPLY_MSG_ID)
                     .map_err(|_| MeteoError::MsgCreationError)
@@ -413,6 +408,17 @@ fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
 
                         ctx.send_msg(reply)
                     })
+            })
+            .or_else(|err| {
+                if err == MeteoError::SensorNotReadyError {
+                    let _ = ctx.light_sensor.set_gain_and_integ_time(
+                        tsl2651::Gain::Gain1x,
+                        tsl2651::IntegrationTime::Time101ms,
+                    );
+                    let _ = ctx.light_sensor.set_state(tsl2651::State::On);
+                }
+
+                Err(err)
             }),
     };
 

@@ -1,6 +1,7 @@
 use bsp::i2c;
 
 use mouros::tasks;
+use super::MeteoError;
 
 const BMP085_I2C_ADDR: u8 = 0x77;
 
@@ -63,17 +64,19 @@ impl Bmp085 {
         }
     }
 
-    fn get_calibration_data(&mut self) -> Result<(), ()> {
+    fn get_calibration_data(&mut self) -> Result<(), MeteoError> {
         let mut set_addr = [0xaa];
         let mut conf_data = [0; 22];
 
-        self.i2c_bus.run_transaction(
-            self.dev_addr,
-            &mut [
-                i2c::Step::Write(&mut set_addr),
-                i2c::Step::Read(&mut conf_data),
-            ],
-        )?;
+        self.i2c_bus
+            .run_transaction(
+                self.dev_addr,
+                &mut [
+                    i2c::Step::Write(&mut set_addr),
+                    i2c::Step::Read(&mut conf_data),
+                ],
+            )
+            .map_err(|_| MeteoError::I2CCommError)?;
 
         self.calib = Some(CalibrationData {
             ac1: ((conf_data[0] as u16) << 8 | conf_data[1] as u16) as i16 as i32,
@@ -92,28 +95,31 @@ impl Bmp085 {
         Ok(())
     }
 
-    fn get_raw_temp_val(&self) -> Result<i32, ()> {
+    fn get_raw_temp_val(&self) -> Result<i32, MeteoError> {
         let mut t_meas_cmd = [0xf4, 0x2e];
         let mut t_data_addr = [0xf6];
         let mut t_data_buf = [0; 2];
 
         self.i2c_bus
-            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)])?;
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)])
+            .map_err(|_| MeteoError::I2CCommError)?;
 
         tasks::sleep(5);
 
-        self.i2c_bus.run_transaction(
-            self.dev_addr,
-            &mut [
-                i2c::Step::Write(&mut t_data_addr),
-                i2c::Step::Read(&mut t_data_buf),
-            ],
-        )?;
+        self.i2c_bus
+            .run_transaction(
+                self.dev_addr,
+                &mut [
+                    i2c::Step::Write(&mut t_data_addr),
+                    i2c::Step::Read(&mut t_data_buf),
+                ],
+            )
+            .map_err(|_| MeteoError::I2CCommError)?;
 
         Ok((((t_data_buf[0] as u32) << 8) | t_data_buf[1] as u32) as i32)
     }
 
-    fn get_raw_pressure_val(&self) -> Result<i32, ()> {
+    fn get_raw_pressure_val(&self) -> Result<i32, MeteoError> {
         let oss = self.precision.get_oversampling_param();
 
         let mut p_meas_cmd = [0xf4, (0x34 + (oss << 6)) as u8];
@@ -121,17 +127,20 @@ impl Bmp085 {
         let mut p_data_buf = [0; 3];
 
         self.i2c_bus
-            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)])?;
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)])
+            .map_err(|_| MeteoError::I2CCommError)?;
 
         tasks::sleep(self.precision.get_pressure_conversion_time_ms());
 
-        self.i2c_bus.run_transaction(
-            self.dev_addr,
-            &mut [
-                i2c::Step::Write(&mut p_data_addr),
-                i2c::Step::Read(&mut p_data_buf),
-            ],
-        )?;
+        self.i2c_bus
+            .run_transaction(
+                self.dev_addr,
+                &mut [
+                    i2c::Step::Write(&mut p_data_addr),
+                    i2c::Step::Read(&mut p_data_buf),
+                ],
+            )
+            .map_err(|_| MeteoError::I2CCommError)?;
 
         Ok(
             (((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32)
@@ -143,12 +152,12 @@ impl Bmp085 {
         self.precision = precision;
     }
 
-    pub fn measure(&mut self) -> Result<(f32, f32), ()> {
+    pub fn measure(&mut self) -> Result<(f32, f32), MeteoError> {
         if self.calib.is_none() {
             self.get_calibration_data()?;
         }
 
-        let calib = self.calib.as_ref().ok_or(())?;
+        let calib = self.calib.as_ref().ok_or(MeteoError::I2CCommError)?;
 
         let ut = self.get_raw_temp_val()?;
         let up = self.get_raw_pressure_val()?;

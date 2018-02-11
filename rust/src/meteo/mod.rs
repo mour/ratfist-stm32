@@ -1,4 +1,3 @@
-
 use mouros::CVoid;
 use mouros::tasks;
 use mouros::tasks::CriticalLock;
@@ -6,11 +5,9 @@ use mouros::pool_alloc::Pool;
 
 use mouros::mailbox;
 use mouros::mailbox::Mailbox;
-use mouros::mailbox::{TxChannelSpsc, RxChannelSpsc};
-use mouros::mailbox::{SendError, RecvError};
+use mouros::mailbox::{RxChannelSpsc, TxChannelSpsc};
 
 use bindings::message_dispatcher as md;
-use bindings::message_dispatcher::MemManagement;
 
 use bsp::i2c;
 
@@ -20,7 +17,6 @@ use core::slice;
 
 use core::convert::TryFrom;
 use core::fmt::Write;
-
 
 mod bmp085;
 mod tsl2651;
@@ -36,7 +32,6 @@ union MessagePayload {
     std_response: StdResponsePayload,
 }
 
-
 const GET_TEMPERATURE_MSG_ID: u32 = 0;
 const GET_PRESSURE_MSG_ID: u32 = 1;
 const GET_HUMIDITY_MSG_ID: u32 = 2;
@@ -47,6 +42,14 @@ const PRESSURE_REPLY_MSG_ID: u32 = 5;
 const HUMIDITY_REPLY_MSG_ID: u32 = 6;
 const LIGHT_LEVEL_REPLY_MSG_ID: u32 = 7;
 
+#[repr(i32)]
+#[derive(Copy, Clone)]
+enum MeteoError {
+    I2CCommError = -1,
+    TxQueueFullError = -2,
+    InvalidMsgError = -3,
+    MsgCreationError = -4,
+}
 
 static mut MESSAGE_ARR: Option<[md::message; 20]> = None;
 static mut MESSAGE_POOL: Option<CriticalLock<Pool<md::message>>> = None;
@@ -56,23 +59,21 @@ static mut MESSAGE_PAYLOAD_POOL: Option<CriticalLock<Pool<MessagePayload>>> = No
 
 unsafe extern "C" fn meteo_alloc(msg_type_id: u32) -> *mut md::message {
     let msg_pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
-    let payload_pool = MESSAGE_PAYLOAD_POOL.as_ref().expect(
-        "message payload pool not initialized",
-    );
+    let payload_pool = MESSAGE_PAYLOAD_POOL
+        .as_ref()
+        .expect("message payload pool not initialized");
 
     match msg_type_id {
-        GET_TEMPERATURE_MSG_ID |
-        GET_PRESSURE_MSG_ID |
-        GET_HUMIDITY_MSG_ID |
-        GET_LIGHT_LEVEL_MSG_ID |
-        TEMPERATURE_REPLY_MSG_ID |
-        PRESSURE_REPLY_MSG_ID |
-        HUMIDITY_REPLY_MSG_ID |
-        LIGHT_LEVEL_REPLY_MSG_ID => {
-            let m = msg_pool.lock().take().and_then(
-                |mut m| if let Some(mut payload) =
-                    payload_pool.lock().take()
-                {
+        GET_TEMPERATURE_MSG_ID
+        | GET_PRESSURE_MSG_ID
+        | GET_HUMIDITY_MSG_ID
+        | GET_LIGHT_LEVEL_MSG_ID
+        | TEMPERATURE_REPLY_MSG_ID
+        | PRESSURE_REPLY_MSG_ID
+        | HUMIDITY_REPLY_MSG_ID
+        | LIGHT_LEVEL_REPLY_MSG_ID => {
+            let m = msg_pool.lock().take().and_then(|m| {
+                if let Some(payload) = payload_pool.lock().take() {
                     *m = mem::zeroed();
                     *payload = mem::zeroed();
 
@@ -83,8 +84,8 @@ unsafe extern "C" fn meteo_alloc(msg_type_id: u32) -> *mut md::message {
                 } else {
                     meteo_free(m);
                     None
-                },
-            );
+                }
+            });
 
             m.unwrap_or(&mut *ptr::null_mut())
         }
@@ -98,24 +99,23 @@ unsafe extern "C" fn meteo_free(msg: *mut md::message) {
     }
 
     let msg_pool = MESSAGE_POOL.as_ref().expect("message pool not initialized");
-    let payload_pool = MESSAGE_PAYLOAD_POOL.as_ref().expect(
-        "message payload pool not initialized",
-    );
+    let payload_pool = MESSAGE_PAYLOAD_POOL
+        .as_ref()
+        .expect("message payload pool not initialized");
 
     match (*msg).msg_type {
-        GET_TEMPERATURE_MSG_ID |
-        GET_PRESSURE_MSG_ID |
-        GET_HUMIDITY_MSG_ID |
-        GET_LIGHT_LEVEL_MSG_ID |
-        TEMPERATURE_REPLY_MSG_ID |
-        PRESSURE_REPLY_MSG_ID |
-        HUMIDITY_REPLY_MSG_ID |
-        LIGHT_LEVEL_REPLY_MSG_ID => {
+        GET_TEMPERATURE_MSG_ID
+        | GET_PRESSURE_MSG_ID
+        | GET_HUMIDITY_MSG_ID
+        | GET_LIGHT_LEVEL_MSG_ID
+        | TEMPERATURE_REPLY_MSG_ID
+        | PRESSURE_REPLY_MSG_ID
+        | HUMIDITY_REPLY_MSG_ID
+        | LIGHT_LEVEL_REPLY_MSG_ID => {
             if !(*msg).data.is_null() {
-                payload_pool.lock().give(
-                    &mut *((*msg).data as
-                        *mut MessagePayload),
-                );
+                payload_pool
+                    .lock()
+                    .give(&mut *((*msg).data as *mut MessagePayload));
             }
             msg_pool.lock().give(&mut *msg);
         }
@@ -140,7 +140,6 @@ unsafe extern "C" fn single_channel_num_parse(
     true
 }
 
-
 unsafe extern "C" fn std_response_serialize(
     msg_ptr: *const md::message,
     output_str: *mut u8,
@@ -161,8 +160,6 @@ unsafe extern "C" fn std_response_serialize(
         -1
     }
 }
-
-
 
 enum IncomingMsg<'payload> {
     GetTemperature(&'payload u32),
@@ -187,7 +184,6 @@ derive_message_wrapper!(IncomingMsg<'payload>, [
     meteo_alloc,
     meteo_free);
 
-
 struct TemperatureReply<'payload>(&'payload mut u32, &'payload mut f32);
 
 derive_message_wrapper!(TemperatureReply<'payload>,
@@ -197,7 +193,6 @@ derive_message_wrapper!(TemperatureReply<'payload>,
     }),
     meteo_alloc,
     meteo_free);
-
 
 struct PressureReply<'payload>(&'payload mut u32, &'payload mut f32);
 
@@ -209,7 +204,6 @@ derive_message_wrapper!(PressureReply<'payload>,
     meteo_alloc,
     meteo_free);
 
-
 struct HumidityReply<'payload>(&'payload mut u32, &'payload mut f32);
 
 derive_message_wrapper!(HumidityReply<'payload>,
@@ -220,7 +214,6 @@ derive_message_wrapper!(HumidityReply<'payload>,
     meteo_alloc,
     meteo_free);
 
-
 struct LightLevelReply<'payload>(&'payload mut u32, &'payload mut f32);
 
 derive_message_wrapper!(LightLevelReply<'payload>,
@@ -230,7 +223,6 @@ derive_message_wrapper!(LightLevelReply<'payload>,
     }),
     meteo_alloc,
     meteo_free);
-
 
 static mut RX_QUEUE_ARR: Option<[*mut md::message; 20]> = None;
 static mut RX_QUEUE: Option<Mailbox<*mut md::message>> = None;
@@ -244,8 +236,6 @@ static mut ERR_QUEUE: Option<Mailbox<i32>> = None;
 static mut MSG_HANDLERS: Option<[md::message_handler; 8]> = None;
 static mut MSG_CONF: Option<md::subsystem_message_conf> = None;
 
-
-
 struct MeteoTaskCtx<'mb, 'mem: 'mb> {
     rx_msg_queue: RxChannelSpsc<'mb, 'mem, *mut md::message>,
     tx_msg_queue: TxChannelSpsc<'mb, 'mem, *mut md::message>,
@@ -255,23 +245,20 @@ struct MeteoTaskCtx<'mb, 'mem: 'mb> {
 }
 
 impl<'mb, 'mem> MeteoTaskCtx<'mb, 'mem> {
-    fn send_msg<T>(&self, msg: md::MessageWrapper<T>) -> Result<(), ()>
+    fn send_msg<T>(&self, msg: md::MessageWrapper<T>) -> Result<(), MeteoError>
     where
         T: md::Wrappable,
     {
         self.tx_msg_queue.try_send(msg.into()).or_else(|err| {
             T::free(err.0);
-            self.send_err(-2);
-            Err(())
+            Err(MeteoError::TxQueueFullError)
         })
     }
 
-    fn send_err(&self, err_code: i32) {
-        let _ = self.err_msg_queue.try_send(err_code);
+    fn send_err(&self, err: MeteoError) {
+        let _ = self.err_msg_queue.try_send(err as i32);
     }
 }
-
-
 
 static mut METEO_CTX: Option<MeteoTaskCtx> = None;
 
@@ -290,66 +277,62 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
     ERR_QUEUE_ARR = Some(mem::zeroed());
     ERR_QUEUE = Some(Mailbox::new(ERR_QUEUE_ARR.as_mut().unwrap().as_mut()));
 
-
     MESSAGE_ARR = Some(mem::zeroed());
-    MESSAGE_POOL = Some(CriticalLock::new(
-        Pool::new(MESSAGE_ARR.as_mut().unwrap().as_mut()),
-    ));
+    MESSAGE_POOL = Some(CriticalLock::new(Pool::new(
+        MESSAGE_ARR.as_mut().unwrap().as_mut(),
+    )));
 
     MESSAGE_PAYLOAD_ARR = Some(mem::zeroed());
-    MESSAGE_PAYLOAD_POOL = Some(CriticalLock::new(
-        Pool::new(MESSAGE_PAYLOAD_ARR.as_mut().unwrap().as_mut()),
-    ));
+    MESSAGE_PAYLOAD_POOL = Some(CriticalLock::new(Pool::new(
+        MESSAGE_PAYLOAD_ARR.as_mut().unwrap().as_mut(),
+    )));
 
     let (rx_msg_queue, _) = mailbox::channel_spsc(RX_QUEUE.as_mut().unwrap());
     let (_, tx_msg_queue) = mailbox::channel_spsc(TX_QUEUE.as_mut().unwrap());
     let (_, err_msg_queue) = mailbox::channel_spsc(ERR_QUEUE.as_mut().unwrap());
 
-
-    MSG_HANDLERS = Some(
-        [
-            md::message_handler {
-                message_name: b"GET_TEMPERATURE\0" as *const u8,
-                parsing_func: Some(single_channel_num_parse),
-                serialization_func: None,
-            },
-            md::message_handler {
-                message_name: b"GET_PRESSURE\0" as *const u8,
-                parsing_func: Some(single_channel_num_parse),
-                serialization_func: None,
-            },
-            md::message_handler {
-                message_name: b"GET_HUMIDITY\0" as *const u8,
-                parsing_func: Some(single_channel_num_parse),
-                serialization_func: None,
-            },
-            md::message_handler {
-                message_name: b"GET_LIGHT_LEVEL\0" as *const u8,
-                parsing_func: Some(single_channel_num_parse),
-                serialization_func: None,
-            },
-            md::message_handler {
-                message_name: b"TEMPERATURE_REPLY\0" as *const u8,
-                parsing_func: None,
-                serialization_func: Some(std_response_serialize),
-            },
-            md::message_handler {
-                message_name: b"PRESSURE_REPLY\0" as *const u8,
-                parsing_func: None,
-                serialization_func: Some(std_response_serialize),
-            },
-            md::message_handler {
-                message_name: b"HUMIDITY_REPLY\0" as *const u8,
-                parsing_func: None,
-                serialization_func: Some(std_response_serialize),
-            },
-            md::message_handler {
-                message_name: b"LIGHT_LEVEL_REPLY\0" as *const u8,
-                parsing_func: None,
-                serialization_func: Some(std_response_serialize),
-            },
-        ],
-    );
+    MSG_HANDLERS = Some([
+        md::message_handler {
+            message_name: b"GET_TEMPERATURE\0" as *const u8,
+            parsing_func: Some(single_channel_num_parse),
+            serialization_func: None,
+        },
+        md::message_handler {
+            message_name: b"GET_PRESSURE\0" as *const u8,
+            parsing_func: Some(single_channel_num_parse),
+            serialization_func: None,
+        },
+        md::message_handler {
+            message_name: b"GET_HUMIDITY\0" as *const u8,
+            parsing_func: Some(single_channel_num_parse),
+            serialization_func: None,
+        },
+        md::message_handler {
+            message_name: b"GET_LIGHT_LEVEL\0" as *const u8,
+            parsing_func: Some(single_channel_num_parse),
+            serialization_func: None,
+        },
+        md::message_handler {
+            message_name: b"TEMPERATURE_REPLY\0" as *const u8,
+            parsing_func: None,
+            serialization_func: Some(std_response_serialize),
+        },
+        md::message_handler {
+            message_name: b"PRESSURE_REPLY\0" as *const u8,
+            parsing_func: None,
+            serialization_func: Some(std_response_serialize),
+        },
+        md::message_handler {
+            message_name: b"HUMIDITY_REPLY\0" as *const u8,
+            parsing_func: None,
+            serialization_func: Some(std_response_serialize),
+        },
+        md::message_handler {
+            message_name: b"LIGHT_LEVEL_REPLY\0" as *const u8,
+            parsing_func: None,
+            serialization_func: Some(std_response_serialize),
+        },
+    ]);
 
     MSG_CONF = Some(md::subsystem_message_conf {
         subsystem_name: b"METEO\0" as *const u8,
@@ -362,10 +345,7 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
         free_message: Some(meteo_free),
     });
 
-
-
     md::dispatcher_register_subsystem(MSG_CONF.as_mut().unwrap());
-
 
     let mut press_sensor = bmp085::Bmp085::new(i2c::Peripheral::I2C3);
     press_sensor.set_precision(bmp085::Precision::UltraHigh);
@@ -383,68 +363,73 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
     METEO_CTX.as_ref().unwrap() as *const MeteoTaskCtx as *const CVoid
 }
 
-
-
 fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
-    match *msg {
-        IncomingMsg::GetTemperature(ch) => {
-            ctx.press_sensor.measure().and_then(|(t, _)| {
-
+    let res = match *msg {
+        IncomingMsg::GetTemperature(ch) => ctx.press_sensor
+            .measure()
+            .map_err(|_| MeteoError::I2CCommError)
+            .and_then(|(t, _)| {
                 md::MessageWrapper::new(msg.get_transaction_id(), TEMPERATURE_REPLY_MSG_ID)
+                    .map_err(|_| MeteoError::MsgCreationError)
                     .and_then(|mut reply: md::MessageWrapper<TemperatureReply>| {
                         *reply.0 = *ch;
                         *reply.1 = t;
 
                         ctx.send_msg(reply)
                     })
-            });
-        }
-        IncomingMsg::GetPressure(ch) => {
-            ctx.press_sensor.measure().and_then(|(_, p)| {
-
+            }),
+        IncomingMsg::GetPressure(ch) => ctx.press_sensor
+            .measure()
+            .map_err(|_| MeteoError::I2CCommError)
+            .and_then(|(_, p)| {
                 md::MessageWrapper::new(msg.get_transaction_id(), PRESSURE_REPLY_MSG_ID)
+                    .map_err(|_| MeteoError::MsgCreationError)
                     .and_then(|mut reply: md::MessageWrapper<PressureReply>| {
                         *reply.0 = *ch;
                         *reply.1 = p;
 
                         ctx.send_msg(reply)
                     })
-            });
-        }
+            }),
         IncomingMsg::GetHumidity(ch) => {
             md::MessageWrapper::new(msg.get_transaction_id(), HUMIDITY_REPLY_MSG_ID)
+                .map_err(|_| MeteoError::MsgCreationError)
                 .and_then(|mut reply: md::MessageWrapper<HumidityReply>| {
                     *reply.0 = *ch;
                     *reply.1 = 0.0;
 
                     ctx.send_msg(reply)
-                });
+                })
         }
-        IncomingMsg::GetLightLevel(ch) => {
-            ctx.light_sensor.measure().and_then(|level| {
+        IncomingMsg::GetLightLevel(ch) => ctx.light_sensor
+            .measure()
+            .map_err(|_| MeteoError::I2CCommError)
+            .and_then(|level| {
                 md::MessageWrapper::new(msg.get_transaction_id(), LIGHT_LEVEL_REPLY_MSG_ID)
+                    .map_err(|_| MeteoError::MsgCreationError)
                     .and_then(|mut reply: md::MessageWrapper<LightLevelReply>| {
                         *reply.0 = *ch;
                         *reply.1 = level;
 
                         ctx.send_msg(reply)
                     })
-            });
-        }
+            }),
+    };
+
+    if let Err(e) = res {
+        ctx.send_err(e);
     }
 }
 
-
 #[no_mangle]
 pub extern "C" fn rust_meteo_comm_loop(ctx_raw: *mut CVoid) {
-
     let ctx = unsafe { &mut *(ctx_raw as *mut MeteoTaskCtx) };
 
     if let Ok(msg_ptr) = ctx.rx_msg_queue.try_recv() {
         if let Ok(msg) = md::MessageWrapper::try_from(msg_ptr) {
             process_msg(ctx, msg);
         } else {
-            ctx.send_err(-1);
+            ctx.send_err(MeteoError::InvalidMsgError);
         }
     }
 

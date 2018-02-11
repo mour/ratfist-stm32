@@ -1,6 +1,5 @@
-
 use bsp;
-use volatile_register::{RW, RO, WO};
+use volatile_register::{RO, RW, WO};
 
 const GPIO_MODER_MODER_INPUT: u32 = 0;
 const GPIO_MODER_MODER_OUTPUT: u32 = 1;
@@ -35,7 +34,6 @@ const GPIO_AFR_AFR_AF12: u32 = 12;
 const GPIO_AFR_AFR_AF13: u32 = 13;
 const GPIO_AFR_AFR_AF14: u32 = 14;
 const GPIO_AFR_AFR_AF15: u32 = 15;
-
 
 struct PortRegs {
     moder: RW<u32>,

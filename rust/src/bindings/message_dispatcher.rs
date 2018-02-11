@@ -23,17 +23,14 @@ pub struct message {
     pub data: *mut CVoid,
 }
 
-
 #[repr(C)]
 pub struct message_handler {
     pub message_name: *const u8,
     pub parsing_func:
         Option<unsafe extern "C" fn(msg_ptr: *mut message, save_ptr: *mut u8) -> bool>,
     pub serialization_func: Option<
-        unsafe extern "C" fn(msg_ptr: *const message,
-                             output_str: *mut u8,
-                             output_str_max_len: u32)
-                             -> isize,
+        unsafe extern "C" fn(msg_ptr: *const message, output_str: *mut u8, output_str_max_len: u32)
+            -> isize,
     >,
 }
 
@@ -53,15 +50,10 @@ extern "C" {
     pub fn dispatcher_register_subsystem(conf: *mut subsystem_message_conf) -> bool;
 }
 
-
-
-
-
 pub struct MessageWrapper<T: Wrappable> {
     raw_msg_ptr: *mut message,
     msg: T,
 }
-
 
 pub trait MemManagement {
     fn alloc(msg_type: u32) -> *mut message;
@@ -75,9 +67,6 @@ where
 {
 }
 
-
-
-
 impl<T> Drop for MessageWrapper<T>
 where
     T: Wrappable,
@@ -86,7 +75,6 @@ where
         T::free(self.raw_msg_ptr);
     }
 }
-
 
 impl<T> Deref for MessageWrapper<T>
 where
@@ -122,7 +110,6 @@ where
     }
 }
 
-
 impl<T> TryFrom<*mut message> for MessageWrapper<T>
 where
     T: Wrappable,
@@ -143,13 +130,11 @@ where
     }
 }
 
-
 impl<T> MessageWrapper<T>
 where
     T: Wrappable,
 {
     pub fn new(trans_id: u32, msg_type: u32) -> Result<MessageWrapper<T>, ()> {
-
         if let Ok(msg_wrapper) = MessageWrapper::try_from(T::alloc(msg_type)) {
             unsafe {
                 (*msg_wrapper.raw_msg_ptr).transaction_id = trans_id;
@@ -165,8 +150,6 @@ where
         unsafe { (*self.raw_msg_ptr).transaction_id }
     }
 }
-
-
 
 #[macro_export]
 macro_rules! derive_message_wrapper {
@@ -259,9 +242,6 @@ macro_rules! derive_message_wrapper {
 
     (@as_expr $e:expr) => {$e};
 }
-
-
-
 
 pub struct SyncMemory<T>(T);
 unsafe impl<T> Sync for SyncMemory<T> {}

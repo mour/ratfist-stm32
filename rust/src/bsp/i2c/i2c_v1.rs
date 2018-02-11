@@ -53,7 +53,6 @@ const I2C_TRISE_TRISE_MASK: u32 = 0x3f;
 const I2C_FLTR_ANOFF: u32 = 1 << 4;
 const I2C_FLTR_DNF_MASK: u32 = 0x0f;
 
-
 use super::InterruptContext;
 use super::PeripheralState;
 use super::Step;
@@ -66,7 +65,7 @@ use bsp::nvic;
 
 use mouros::tasks;
 
-use volatile_register::{RW, RO};
+use volatile_register::{RO, RW};
 
 enum CommDir {
     Read,
@@ -86,7 +85,6 @@ pub struct I2C {
     trise: RW<u32>,
     fltr: RW<u32>,
 }
-
 
 pub fn peripheral_init(periph: Peripheral) {
     let i2c = I2C::get_periph(periph);
@@ -198,24 +196,18 @@ pub fn deblock_bus(periph: Peripheral) {
     i2c.reset();
 
     let (sda, scl) = match periph {
-        Peripheral::I2C1 => {
-            (
-                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin9),
-                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin6),
-            )
-        }
-        Peripheral::I2C2 => {
-            (
-                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin3),
-                gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin10),
-            )
-        }
-        Peripheral::I2C3 => {
-            (
-                gpio::Pin::new(gpio::Gpio::GpioC, gpio::PinNum::Pin9),
-                gpio::Pin::new(gpio::Gpio::GpioA, gpio::PinNum::Pin8),
-            )
-        }
+        Peripheral::I2C1 => (
+            gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin9),
+            gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin6),
+        ),
+        Peripheral::I2C2 => (
+            gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin3),
+            gpio::Pin::new(gpio::Gpio::GpioB, gpio::PinNum::Pin10),
+        ),
+        Peripheral::I2C3 => (
+            gpio::Pin::new(gpio::Gpio::GpioC, gpio::PinNum::Pin9),
+            gpio::Pin::new(gpio::Gpio::GpioA, gpio::PinNum::Pin8),
+        ),
     };
 
     sda.set_pullup_pulldown_mode(gpio::PullUpDown::PullUp);
@@ -284,13 +276,16 @@ impl I2C {
         // ARLO - arbitration lost - cleared by writing 0.
         // AF - acknowledge failure - set when no ACK received. Cleared by writing 0.
         unsafe {
-            self.sr1.modify(|curr| curr & (!I2C_SR1_BERR & !I2C_SR1_ARLO & !I2C_SR1_AF));
+            self.sr1
+                .modify(|curr| curr & (!I2C_SR1_BERR & !I2C_SR1_ARLO & !I2C_SR1_AF));
         }
     }
 
     fn clear_transaction_ctrl_bits(&self) {
         unsafe {
-            self.cr1.modify(|curr| curr & (!I2C_CR1_POS & !I2C_CR1_ACK & !I2C_CR1_STOP & !I2C_CR1_START));
+            self.cr1.modify(|curr| {
+                curr & (!I2C_CR1_POS & !I2C_CR1_ACK & !I2C_CR1_STOP & !I2C_CR1_START)
+            });
         }
     }
 
@@ -312,9 +307,8 @@ impl I2C {
             let trise = periph_freq_hz / 1000000 + 1;
             let periph_freq_mhz = periph_freq_hz / 1000000;
 
-            self.cr2.modify(
-                |curr| curr | (periph_freq_mhz & I2C_CR2_FREQ_MASK),
-            );
+            self.cr2
+                .modify(|curr| curr | (periph_freq_mhz & I2C_CR2_FREQ_MASK));
             self.ccr.write(ccr & I2C_CCR_CCR_MASK);
             self.trise.write(trise & I2C_TRISE_TRISE_MASK);
         }
@@ -322,19 +316,20 @@ impl I2C {
 
     fn set_analog_filter_state(&self, new_state: bool) {
         unsafe {
-            self.fltr.modify(|curr| if new_state {
-                curr & !I2C_FLTR_ANOFF
-            } else {
-                curr | I2C_FLTR_ANOFF
+            self.fltr.modify(|curr| {
+                if new_state {
+                    curr & !I2C_FLTR_ANOFF
+                } else {
+                    curr | I2C_FLTR_ANOFF
+                }
             });
         }
     }
 
     fn set_digital_filter_len(&self, new_len: u32) {
         unsafe {
-            self.fltr.modify(
-                |curr| curr | (new_len & I2C_FLTR_DNF_MASK),
-            );
+            self.fltr
+                .modify(|curr| curr | (new_len & I2C_FLTR_DNF_MASK));
         }
     }
 
@@ -452,7 +447,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
     let periph: &I2C = I2C::get_periph(ctx.periph_id);
 
     if let Some(ref mut trans) = ctx.current_transaction {
-
         match ctx.state {
             PeripheralState::StartBitSet => {
                 if !periph.is_sb_set() {
@@ -502,8 +496,8 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
             }
 
             PeripheralState::Transmitting(next_byte_pos) => {
-                if (next_byte_pos >= trans.steps[trans.curr_step].len() &&
-                        !periph.is_btf_set()) || !periph.is_txe_set()
+                if (next_byte_pos >= trans.steps[trans.curr_step].len() && !periph.is_btf_set())
+                    || !periph.is_txe_set()
                 {
                     return;
                 }
@@ -519,7 +513,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                     }
 
                     periph.disable_buffer_interrupts();
-
                 } else {
                     periph.send_data(trans.steps[trans.curr_step].as_ref()[next_byte_pos]);
                     ctx.state = PeripheralState::Transmitting(next_byte_pos + 1);
@@ -543,7 +536,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                         trans.curr_step += 1;
                         ctx.state = PeripheralState::StartBitSet;
                     }
-
                 } else if next_byte_pos == trans.steps[trans.curr_step].len() - 2 {
                     if periph.is_rxne_set() {
                         periph.disable_ack();
@@ -567,7 +559,6 @@ pub extern "C" fn rust_i2c_interrupt_handler(ctx_id: usize) {
                         trans.curr_step += 1;
                         ctx.state = PeripheralState::StartBitSet;
                     }
-
                 } else {
                     if !periph.is_rxne_set() {
                         return;

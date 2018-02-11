@@ -1,10 +1,9 @@
-
 #[cfg(feature = "stm32f411discovery")]
 mod i2c_v1;
 #[cfg(feature = "stm32f411discovery")]
 use self::i2c_v1 as i2c_impl;
 
-pub use self::i2c_impl::{rust_i2c_interrupt_handler, rust_i2c_interrupt_error_handler};
+pub use self::i2c_impl::{rust_i2c_interrupt_error_handler, rust_i2c_interrupt_handler};
 pub use self::i2c_impl::peripheral_init;
 
 use core::mem;
@@ -18,7 +17,6 @@ enum PeripheralState {
     Done(i32),
 }
 
-
 pub enum Step<'a> {
     Read(&'a mut [u8]),
     Write(&'a mut [u8]),
@@ -27,8 +25,7 @@ pub enum Step<'a> {
 impl<'a> AsMut<[u8]> for Step<'a> {
     fn as_mut(&mut self) -> &mut [u8] {
         match *self {
-            Step::Read(ref mut data) |
-            Step::Write(ref mut data) => data,
+            Step::Read(ref mut data) | Step::Write(ref mut data) => data,
         }
     }
 }
@@ -36,8 +33,7 @@ impl<'a> AsMut<[u8]> for Step<'a> {
 impl<'a> AsRef<[u8]> for Step<'a> {
     fn as_ref(&self) -> &[u8] {
         match *self {
-            Step::Read(ref data) |
-            Step::Write(ref data) => data,
+            Step::Read(ref data) | Step::Write(ref data) => data,
         }
     }
 }
@@ -50,7 +46,6 @@ impl<'a> Step<'a> {
         }
     }
 }
-
 
 struct Transaction<'a, 'b: 'a> {
     steps: &'a mut [Step<'b>],

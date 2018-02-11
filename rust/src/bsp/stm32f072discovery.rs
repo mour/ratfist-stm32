@@ -1,4 +1,3 @@
-
 #[allow(dead_code)]
 pub mod periph_base_addr {
     pub const GPIOA: usize = 0x48000000;

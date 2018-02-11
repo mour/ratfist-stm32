@@ -2,7 +2,6 @@
 #![feature(lang_items)]
 #![no_std]
 
-
 // TODO Replace with 'matches' once that stops depending on std.
 #[macro_export]
 macro_rules! matches {
@@ -21,7 +20,6 @@ macro_rules! matches {
 macro_rules! __as_expr {
     ($value:expr) => ($value)
 }
-
 
 #[macro_use]
 extern crate mouros;

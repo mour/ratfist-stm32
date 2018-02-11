@@ -1,4 +1,3 @@
-
 #[allow(dead_code)]
 pub mod periph_base_addr {
     pub const I2C1: usize = 1073763328;
@@ -16,7 +15,7 @@ pub mod periph_base_addr {
 }
 
 pub mod nvic {
-    use volatile_register::{RW, RO, WO};
+    use volatile_register::{RO, RW, WO};
     use super::scb;
 
     const NVIC_IPR_PRIO_OFFSET: u8 = 4;
@@ -129,9 +128,8 @@ pub mod nvic {
         let prio_mask = 0xff << bp_offset << NVIC_IPR_PRIO_OFFSET;
 
         unsafe {
-            nvic.ipr[int as usize].modify(|curr| {
-                (curr & !prio_mask) | ((prio << bp_offset) << NVIC_IPR_PRIO_OFFSET)
-            });
+            nvic.ipr[int as usize]
+                .modify(|curr| (curr & !prio_mask) | ((prio << bp_offset) << NVIC_IPR_PRIO_OFFSET));
         }
     }
 
@@ -144,9 +142,7 @@ pub mod nvic {
         let subprio_shifted_masked = (subprio << NVIC_IPR_PRIO_OFFSET) & !prio_mask;
 
         unsafe {
-            nvic.ipr[int as usize].modify(|curr| {
-                (curr & prio_mask) | subprio_shifted_masked
-            });
+            nvic.ipr[int as usize].modify(|curr| (curr & prio_mask) | subprio_shifted_masked);
         }
     }
 
@@ -162,7 +158,7 @@ pub mod nvic {
 }
 
 pub mod scb {
-    use volatile_register::{RW, RO};
+    use volatile_register::{RO, RW};
     use core::mem;
 
     const SCB_AIRCR_VECTKEY: u32 = 0x05fa0000;
@@ -202,15 +198,13 @@ pub mod scb {
         NoneSixteen = 0b111,
     }
 
-
     pub fn set_priority_grouping(grouping: ItPriorityGrouping) {
         let scb = unsafe { &*(super::periph_base_addr::SCB as *const Scb) };
 
         unsafe {
             scb.aircr.modify(|curr| {
-                (curr & !SCB_AIRCR_VECTKEY_MASK) |
-                SCB_AIRCR_VECTKEY |
-                ((grouping as u32) << SCB_AIRCR_PRIGROUP_OFFSET)
+                (curr & !SCB_AIRCR_VECTKEY_MASK) | SCB_AIRCR_VECTKEY
+                    | ((grouping as u32) << SCB_AIRCR_PRIGROUP_OFFSET)
             });
         }
     }
@@ -270,7 +264,6 @@ pub mod rcc {
     const RCC_APB2_USART1: u32 = 1 << 4;
     const RCC_APB2_TIM1: u32 = 1;
 
-
     struct Rcc {
         _cr: RW<u32>,
         _pllcfgr: RW<u32>,
@@ -308,7 +301,6 @@ pub mod rcc {
         _plli2scfgr: RW<u32>,
         _dckcfgr: RW<u32>,
     }
-
 
     #[derive(Copy, Clone)]
     enum Bus {
@@ -362,34 +354,40 @@ pub mod rcc {
     impl Peripheral {
         fn get_bus(&self) -> Bus {
             match *self {
-                Peripheral::GpioA | Peripheral::GpioB | Peripheral::GpioC | Peripheral::GpioD |
-                Peripheral::GpioE | Peripheral::GpioH | Peripheral::Crc | Peripheral::Dma1 |
-                Peripheral::Dma2 => Bus::Ahb1,
+                Peripheral::GpioA
+                | Peripheral::GpioB
+                | Peripheral::GpioC
+                | Peripheral::GpioD
+                | Peripheral::GpioE
+                | Peripheral::GpioH
+                | Peripheral::Crc
+                | Peripheral::Dma1
+                | Peripheral::Dma2 => Bus::Ahb1,
                 Peripheral::OtgFs => Bus::Ahb2,
-                Peripheral::Tim2 |
-                Peripheral::Tim3 |
-                Peripheral::Tim4 |
-                Peripheral::Tim5 |
-                Peripheral::Wwdg |
-                Peripheral::Spi2 |
-                Peripheral::Spi3 |
-                Peripheral::Usart2 |
-                Peripheral::I2C1 |
-                Peripheral::I2C2 |
-                Peripheral::I2C3 |
-                Peripheral::Pwr => Bus::Apb1,
-                Peripheral::Tim1 |
-                Peripheral::Usart1 |
-                Peripheral::Usart6 |
-                Peripheral::Adc1 |
-                Peripheral::Sdio |
-                Peripheral::Spi1 |
-                Peripheral::Spi4 |
-                Peripheral::SysCfg |
-                Peripheral::Tim9 |
-                Peripheral::Tim10 |
-                Peripheral::Tim11 |
-                Peripheral::Spi5 => Bus::Apb2,
+                Peripheral::Tim2
+                | Peripheral::Tim3
+                | Peripheral::Tim4
+                | Peripheral::Tim5
+                | Peripheral::Wwdg
+                | Peripheral::Spi2
+                | Peripheral::Spi3
+                | Peripheral::Usart2
+                | Peripheral::I2C1
+                | Peripheral::I2C2
+                | Peripheral::I2C3
+                | Peripheral::Pwr => Bus::Apb1,
+                Peripheral::Tim1
+                | Peripheral::Usart1
+                | Peripheral::Usart6
+                | Peripheral::Adc1
+                | Peripheral::Sdio
+                | Peripheral::Spi1
+                | Peripheral::Spi4
+                | Peripheral::SysCfg
+                | Peripheral::Tim9
+                | Peripheral::Tim10
+                | Peripheral::Tim11
+                | Peripheral::Spi5 => Bus::Apb2,
             }
         }
 
@@ -479,8 +477,6 @@ pub mod rcc {
         }
     }
 }
-
-
 
 pub fn board_specific_init() {
     scb::set_priority_grouping(scb::ItPriorityGrouping::EightTwo);

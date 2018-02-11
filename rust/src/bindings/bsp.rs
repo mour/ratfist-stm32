@@ -15,7 +15,6 @@ extern "C" {
     fn bsp_led_toggle(led: i32);
 }
 
-
 pub fn led_get_state(led: i32) -> bool {
     unsafe { bsp_led_get_state(led) != 0 }
 }

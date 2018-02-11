@@ -1,4 +1,3 @@
-
 use bsp::i2c;
 
 use mouros::tasks;
@@ -47,7 +46,6 @@ struct CalibrationData {
     md: i32,
 }
 
-
 pub struct Bmp085 {
     calib: Option<CalibrationData>,
     dev_addr: u8,
@@ -94,16 +92,13 @@ impl Bmp085 {
         Ok(())
     }
 
-
     fn get_raw_temp_val(&self) -> Result<i32, ()> {
         let mut t_meas_cmd = [0xf4, 0x2e];
         let mut t_data_addr = [0xf6];
         let mut t_data_buf = [0; 2];
 
-        self.i2c_bus.run_transaction(
-            self.dev_addr,
-            &mut [i2c::Step::Write(&mut t_meas_cmd)],
-        )?;
+        self.i2c_bus
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut t_meas_cmd)])?;
 
         tasks::sleep(5);
 
@@ -118,7 +113,6 @@ impl Bmp085 {
         Ok((((t_data_buf[0] as u32) << 8) | t_data_buf[1] as u32) as i32)
     }
 
-
     fn get_raw_pressure_val(&self) -> Result<i32, ()> {
         let oss = self.precision.get_oversampling_param();
 
@@ -126,10 +120,8 @@ impl Bmp085 {
         let mut p_data_addr = [0xf6];
         let mut p_data_buf = [0; 3];
 
-        self.i2c_bus.run_transaction(
-            self.dev_addr,
-            &mut [i2c::Step::Write(&mut p_meas_cmd)],
-        )?;
+        self.i2c_bus
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut p_meas_cmd)])?;
 
         tasks::sleep(self.precision.get_pressure_conversion_time_ms());
 
@@ -141,7 +133,10 @@ impl Bmp085 {
             ],
         )?;
 
-        Ok((((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32) >> (8 - oss)) as i32)
+        Ok(
+            (((p_data_buf[0] as u32) << 16 | (p_data_buf[1] as u32) << 8 | p_data_buf[2] as u32)
+                >> (8 - oss)) as i32,
+        )
     }
 
     pub fn set_precision(&mut self, precision: Precision) {
@@ -149,7 +144,6 @@ impl Bmp085 {
     }
 
     pub fn measure(&mut self) -> Result<(f32, f32), ()> {
-
         if self.calib.is_none() {
             self.get_calibration_data()?;
         }
@@ -159,13 +153,11 @@ impl Bmp085 {
         let ut = self.get_raw_temp_val()?;
         let up = self.get_raw_pressure_val()?;
 
-
         let x1: i32 = (ut - calib.ac6) * calib.ac5 >> 15;
         let x2: i32 = (calib.mc << 11) / (x1 + calib.md);
         let b5: i32 = x1 + x2;
 
         let t: i32 = (b5 + 8) >> 4;
-
 
         let b6: i32 = b5 - 4000;
         let x1: i32 = (calib.b2 * ((b6 * b6) >> 12)) >> 11;
@@ -192,7 +184,6 @@ impl Bmp085 {
         let x2: i32 = (-7357 * p1) >> 16;
 
         let p: i32 = p1 + ((x1 + x2 + 3791) >> 4);
-
 
         Ok(((t as f32) / 10.0, p as f32))
     }

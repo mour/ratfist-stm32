@@ -1,4 +1,3 @@
-
 use bsp::i2c;
 
 const TSL2561_I2C_ADDR: u8 = 0x29;
@@ -7,7 +6,6 @@ const CONTROL_REG_ADDR: u8 = 0x00 | 0x80 | 0x10;
 const TIMING_REG_ADDR: u8 = 0x01 | 0x80 | 0x10;
 const DATA_REG_ADDR: u8 = 0x0b | 0x80 | 0x10;
 const DATA_BYTE_NUM: usize = 5;
-
 
 #[derive(Clone, Copy)]
 #[repr(u8)]
@@ -86,7 +84,11 @@ impl Tsl2561 {
         new_gain: Gain,
         new_integ_time: IntegrationTime,
     ) -> Result<(), ()> {
-        let mut g_it_cmd = [TIMING_REG_ADDR, 0x01, (new_gain as u8) | (new_integ_time as u8)];
+        let mut g_it_cmd = [
+            TIMING_REG_ADDR,
+            0x01,
+            (new_gain as u8) | (new_integ_time as u8),
+        ];
 
         self.i2c_bus
             .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut g_it_cmd)])
@@ -123,12 +125,11 @@ impl Tsl2561 {
             return Ok(0.0);
         }
 
-        let ch0 = (raw_ch0 as f32) / self.gain.get_scaling_factor() /
-            self.integ_time.get_scaling_factor();
+        let ch0 = (raw_ch0 as f32) / self.gain.get_scaling_factor()
+            / self.integ_time.get_scaling_factor();
 
-        let ch1 = (raw_ch1 as f32) / self.gain.get_scaling_factor() /
-            self.integ_time.get_scaling_factor();
-
+        let ch1 = (raw_ch1 as f32) / self.gain.get_scaling_factor()
+            / self.integ_time.get_scaling_factor();
 
         match ch1 / ch0 {
             x if 0.0 <= x && x < 0.125 => Ok(0.0304 * ch0 - 0.0272 * ch1),

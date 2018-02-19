@@ -19,6 +19,7 @@
 #include <libopencm3/stm32/flash.h>
 
 #include <mouros/common.h> // For ARRAY_SIZE()
+#include <mouros/tasks.h> // For os_set_diagnostics()
 
 #include <libopencm3/cm3/cortex.h> // For the critical section macros.
 
@@ -44,6 +45,24 @@ static char tx_buffer_mem[BSP_TX_BUFFER_SIZE];
 static void enable_usart2_tx_interrupt(void) {
 	usart_enable_tx_interrupt(USART2);
 }
+
+#ifdef DIAG_ENABLE
+mailbox_t diag_tx_buffer;
+static char diag_buffer_mem[100];
+
+static void enable_usart6_tx_interrupt(void) {
+	usart_enable_tx_interrupt(USART6);
+}
+
+static uint8_t diag_send_func(uint8_t *msg_buf, uint8_t msg_buf_len)
+{
+	return (uint8_t) os_mailbox_write_multiple(&diag_tx_buffer, msg_buf, msg_buf_len);
+}
+
+static void diag_error_func(void)
+{
+}
+#endif
 
 /**
  * Initializes the clocks and GPIOS for the LEDs to work.
@@ -97,6 +116,34 @@ static void comm_init(void)
 
 	nvic_set_priority(NVIC_USART2_IRQ, 0);
 	nvic_enable_irq(NVIC_USART2_IRQ);
+
+
+#ifdef DIAG_ENABLE
+	os_mailbox_init(&diag_tx_buffer,
+	                    diag_buffer_mem,
+	                    sizeof(diag_buffer_mem),
+	                    sizeof(uint8_t),
+	                    enable_usart6_tx_interrupt);
+
+	rcc_periph_clock_enable(RCC_GPIOC);
+
+	rcc_periph_clock_enable(RCC_USART6);
+
+	gpio_mode_setup(GPIOC, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO6 | GPIO7);
+	gpio_set_af(GPIOC, GPIO_AF8, GPIO6 | GPIO7);
+
+	usart_set_baudrate(USART6, 115200);
+	usart_set_databits(USART6, 8);
+	usart_set_flow_control(USART6, USART_FLOWCONTROL_NONE);
+	usart_set_mode(USART6, USART_MODE_TX);
+	usart_set_parity(USART6, USART_PARITY_NONE);
+	usart_set_stopbits(USART6, USART_CR2_STOPBITS_1);
+
+	usart_enable(USART6);
+
+	nvic_set_priority(NVIC_USART6_IRQ, 0);
+	nvic_enable_irq(NVIC_USART6_IRQ);
+#endif
 }
 
 void bsp_init(void)
@@ -126,6 +173,10 @@ void bsp_init(void)
 	led_init();
 
 	comm_init();
+
+#ifdef DIAG_ENABLE
+	os_set_diagnostics(diag_send_func, diag_error_func);
+#endif
 
 	rust_bsp_init();
 
@@ -188,3 +239,17 @@ void usart2_isr(void)
 		}
 	}
 }
+
+#ifdef DIAG_ENABLE
+void usart6_isr(void)
+{
+	if (usart_get_flag(USART6, USART_SR_TXE)) {
+		char ch = '\0';
+		if (os_char_buffer_read_ch(&diag_tx_buffer, &ch)) {
+			usart_send(USART6, (uint8_t) ch);
+		} else {
+			usart_disable_tx_interrupt(USART6);
+		}
+	}
+}
+#endif

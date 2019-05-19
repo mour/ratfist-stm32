@@ -18,8 +18,13 @@ use core::slice;
 use core::convert::TryFrom;
 use core::fmt::Write;
 
+mod bsp;
+mod am2302;
 mod bmp085;
 mod tsl2651;
+
+pub use self::bsp::isrs::*;
+
 
 #[derive(Copy, Clone)]
 struct StdResponsePayload {
@@ -244,6 +249,7 @@ struct MeteoTaskCtx<'mb, 'mem: 'mb> {
     err_msg_queue: TxChannelSpsc<'mb, 'mem, i32>,
     press_sensor: bmp085::Bmp085,
     light_sensor: tsl2651::Tsl2561,
+    humidity_sensor: am2302::Am2302,
 }
 
 impl<'mb, 'mem> MeteoTaskCtx<'mb, 'mem> {
@@ -354,12 +360,15 @@ pub unsafe extern "C" fn rust_meteo_init() -> *const CVoid {
 
     let light_sensor = tsl2651::Tsl2561::new(i2c::Peripheral::I2C3);
 
+    let humidity_sensor = am2302::Am2302::new(0).expect("could not init Am2302 timer");
+
     METEO_CTX = Some(MeteoTaskCtx {
         rx_msg_queue,
         tx_msg_queue,
         err_msg_queue,
         press_sensor,
         light_sensor,
+        humidity_sensor,
     });
 
     METEO_CTX.as_ref().unwrap() as *const MeteoTaskCtx as *const CVoid
@@ -387,16 +396,16 @@ fn process_msg(ctx: &mut MeteoTaskCtx, msg: md::MessageWrapper<IncomingMsg>) {
                     ctx.send_msg(reply)
                 })
         }),
-        IncomingMsg::GetHumidity(ch) => {
+        IncomingMsg::GetHumidity(ch) => ctx.humidity_sensor.measure().and_then(|(h, _)| {
             md::MessageWrapper::new(msg.get_transaction_id(), HUMIDITY_REPLY_MSG_ID)
                 .map_err(|_| MeteoError::MsgCreationError)
                 .and_then(|mut reply: md::MessageWrapper<HumidityReply>| {
                     *reply.0 = *ch;
-                    *reply.1 = 0.0;
+                    *reply.1 = h;
 
                     ctx.send_msg(reply)
                 })
-        }
+        }),
         IncomingMsg::GetLightLevel(ch) => ctx.light_sensor
             .measure()
             .and_then(|level| {

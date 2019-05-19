@@ -12,6 +12,14 @@ pub mod periph_base_addr {
     pub const RCC: usize = 0x40023800;
     pub const NVIC: usize = 0xE000E100;
     pub const SCB: usize = 0xE000E008;
+    pub const TIM11: usize = 0x4001_4800;
+    pub const TIM10: usize = 0x4001_4400;
+    pub const TIM9: usize = 0x4001_4000;
+    pub const TIM1: usize = 0x4001_0000;
+    pub const TIM5: usize = 0x4000_0C00;
+    pub const TIM4: usize = 0x4000_0800;
+    pub const TIM3: usize = 0x4000_0400;
+    pub const TIM2: usize = 0x4000_0000;
 }
 
 pub mod nvic {

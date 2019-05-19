@@ -1,5 +1,7 @@
 #![feature(try_from)]
 #![feature(lang_items)]
+#![feature(conservative_impl_trait)]
+#![feature(used)]
 #![no_std]
 
 // TODO Replace with 'matches' once that stops depending on std.

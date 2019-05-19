@@ -42,14 +42,14 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libsrc/mouros")
 
 # Rust part of ratfist
 add_custom_target(rust-lib
-                  "xargo" "build" "--lib"
+                  "cargo" "build" "--lib"
                   "--target" "${XARGO_TARGET}"
                   "$<$<CONFIG:Release>:--release>"
                   "--features"
                   "${BOARD_TYPE}$<$<BOOL:${INCLUDE_SPINNER}>:,spinner>$<$<BOOL:${INCLUDE_METEO}>:,meteo>"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
-add_custom_target(rust-clean "xargo" "clean"
+add_custom_target(rust-clean "cargo" "clean"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
 
@@ -107,7 +107,6 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC
     "$<$<BOOL:${INCLUDE_METEO}>:INCLUDE_METEO>"
 )
 
-
 target_link_libraries(${PROJECT_NAME} m)
 target_link_libraries(${PROJECT_NAME} mouros)
 target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${XARGO_TARGET}/$<LOWER_CASE:${CMAKE_BUILD_TYPE}>/libratfist.a")
@@ -115,7 +114,7 @@ target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${X
 
 set_property(
     TARGET ${PROJECT_NAME}
-    PROPERTY LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,-lc -Wl,--gc-sections"
+    PROPERTY LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,-lc -Wl,--gc-sections,-Map=${PROJECT_NAME}.map"
 )
 
 if(NOT USE_FULL_NEWLIB)

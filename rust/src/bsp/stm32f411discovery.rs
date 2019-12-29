@@ -188,6 +188,7 @@ pub mod scb {
         _afsr: RW<u32>,
     }
 
+    #[allow(dead_code)]
     #[repr(u32)]
     #[derive(Copy, Clone)]
     pub enum ItPriorityGrouping {

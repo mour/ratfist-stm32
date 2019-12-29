@@ -58,10 +58,10 @@ use super::PeripheralState;
 use super::Step;
 use super::Peripheral;
 
-use bsp;
-use bsp::gpio;
-use bsp::rcc;
-use bsp::nvic;
+use crate::bsp;
+use crate::bsp::gpio;
+use crate::bsp::rcc;
+use crate::bsp::nvic;
 
 use mouros::tasks;
 

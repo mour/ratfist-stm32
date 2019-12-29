@@ -2,13 +2,14 @@ use mouros::mailbox::Mailbox;
 use mouros::CVoid;
 use mouros::tasks;
 
-use bindings::constants;
-use bindings::message_dispatcher;
+use crate::bindings::constants;
+use crate::bindings::message_dispatcher;
 
 use core::convert::TryFrom;
 
-use bindings::message_dispatcher::{MemManagement, MessageWrapper};
+use crate::bindings::message_dispatcher::{MemManagement, MessageWrapper};
 
+#[allow(non_snake_case)]
 mod MsgTypes {
     pub const SET_PLAN: u32 = 0;
     pub const GET_PLAN: u32 = 1;
@@ -42,6 +43,7 @@ pub struct ret_val {
     pub ret_val: i32,
 }
 
+#[allow(non_snake_case)]
 mod SpinStates {
     pub const STOPPED: u32 = 0;
     pub const RUNNING: u32 = 1;
@@ -339,6 +341,7 @@ fn get_outgoing_queue() -> &'static mut Mailbox<'static, *mut message_dispatcher
     }
 }
 
+#[allow(dead_code)]
 fn get_outgoing_error_queue() -> &'static mut Mailbox<'static, i32> {
     unsafe {
         match SPINNER_CTX {

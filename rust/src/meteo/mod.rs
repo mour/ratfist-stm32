@@ -7,9 +7,9 @@ use mouros::mailbox;
 use mouros::mailbox::Mailbox;
 use mouros::mailbox::{RxChannelSpsc, TxChannelSpsc};
 
-use bindings::message_dispatcher as md;
+use crate::bindings::message_dispatcher as md;
 
-use bsp::i2c;
+use crate::bsp::i2c;
 
 use core::ptr;
 use core::mem;
@@ -27,6 +27,7 @@ struct StdResponsePayload {
     value: f32,
 }
 
+#[allow(dead_code)]
 union MessagePayload {
     channel_num_payload: u32,
     std_response: StdResponsePayload,

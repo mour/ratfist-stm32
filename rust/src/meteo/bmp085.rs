@@ -1,4 +1,4 @@
-use bsp::i2c;
+use crate::bsp::i2c;
 
 use mouros::tasks;
 use super::MeteoError;

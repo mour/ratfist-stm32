@@ -1,4 +1,4 @@
-use bsp::i2c;
+use crate::bsp::i2c;
 
 use super::MeteoError;
 
@@ -16,6 +16,7 @@ pub enum State {
     Off = 0x00,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum Gain {
@@ -32,7 +33,7 @@ impl Gain {
     }
 }
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 #[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum IntegrationTime {
@@ -74,7 +75,7 @@ impl Tsl2561 {
         let mut state_cmd = [CONTROL_REG_ADDR, 0x01, new_state as u8];
 
         self.i2c_bus
-            .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut state_cmd)])
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut state_cmd)])
             .map_err(|_| MeteoError::I2CCommError)
             .and_then(|_| {
                 self.state = new_state;
@@ -94,7 +95,7 @@ impl Tsl2561 {
         ];
 
         self.i2c_bus
-            .run_transaction(TSL2561_I2C_ADDR, &mut [i2c::Step::Write(&mut g_it_cmd)])
+            .run_transaction(self.dev_addr, &mut [i2c::Step::Write(&mut g_it_cmd)])
             .map_err(|_| MeteoError::I2CCommError)
             .and_then(|_| {
                 self.gain = new_gain;
@@ -108,7 +109,7 @@ impl Tsl2561 {
         let mut data_buf = [0; DATA_BYTE_NUM];
 
         let res = self.i2c_bus.run_transaction(
-            TSL2561_I2C_ADDR,
+            self.dev_addr,
             &mut [
                 i2c::Step::Write(&mut data_addr_cmd),
                 i2c::Step::Read(&mut data_buf),

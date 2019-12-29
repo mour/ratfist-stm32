@@ -1,4 +1,3 @@
-#![feature(try_from)]
 #![no_std]
 
 use core::panic::PanicInfo;

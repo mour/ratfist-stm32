@@ -1,4 +1,4 @@
-use bsp;
+use crate::bsp;
 use volatile_register::{RO, RW, WO};
 
 const GPIO_MODER_MODER_INPUT: u32 = 0;

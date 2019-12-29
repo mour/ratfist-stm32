@@ -1,6 +1,7 @@
 #![feature(try_from)]
-#![feature(lang_items)]
 #![no_std]
+
+use core::panic::PanicInfo;
 
 // TODO Replace with 'matches' once that stops depending on std.
 #[macro_export]
@@ -37,12 +38,8 @@ pub mod spinner;
 #[cfg(feature = "meteo")]
 pub mod meteo;
 
-#[lang = "panic_fmt"]
-#[no_mangle]
-pub extern "C" fn rust_begin_panic(
-    _msg: core::fmt::Arguments,
-    _file: &'static str,
-    _line: u32,
-) -> ! {
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }

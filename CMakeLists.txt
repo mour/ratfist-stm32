@@ -26,11 +26,11 @@ endif()
 if(BOARD_TYPE STREQUAL "stm32f072discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f0discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f072rb.ld")
-    set(XARGO_TARGET "thumbv6m-none-eabi")
+    set(CARGO_TARGET "thumbv6m-none-eabi")
 elseif(BOARD_TYPE STREQUAL "stm32f411discovery")
     set(BOARD_FILE "/usr/share/openocd/scripts/board/stm32f4discovery.cfg")
     set(LINK_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ld/stm32f411ve.ld")
-    set(XARGO_TARGET "thumbv7em-none-eabihf")
+    set(CARGO_TARGET "thumbv7em-none-eabihf")
 else()
     message(FATAL_ERROR "Unknown BOARD_TYPE: ${BOARD_TYPE}\nAllowed board types are: stm32f072discovery, stm32f411discovery")
 endif()
@@ -42,14 +42,14 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libsrc/mouros")
 
 # Rust part of ratfist
 add_custom_target(rust-lib
-                  "xargo" "build" "--lib"
-                  "--target" "${XARGO_TARGET}"
+                  "cargo" "build" "--lib"
+                  "--target" "${CARGO_TARGET}"
                   "$<$<CONFIG:Release>:--release>"
                   "--features"
                   "${BOARD_TYPE}$<$<BOOL:${INCLUDE_SPINNER}>:,spinner>$<$<BOOL:${INCLUDE_METEO}>:,meteo>"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
-add_custom_target(rust-clean "xargo" "clean"
+add_custom_target(rust-clean "cargo" "clean"
                   WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/rust")
 
 
@@ -108,14 +108,13 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC
 )
 
 
-target_link_libraries(${PROJECT_NAME} m)
+target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${CARGO_TARGET}/$<LOWER_CASE:${CMAKE_BUILD_TYPE}>/libratfist.a")
+target_link_libraries(${PROJECT_NAME} c)
 target_link_libraries(${PROJECT_NAME} mouros)
-target_link_libraries(${PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/rust/target/${XARGO_TARGET}/$<LOWER_CASE:${CMAKE_BUILD_TYPE}>/libratfist.a")
-
 
 set_property(
     TARGET ${PROJECT_NAME}
-    PROPERTY LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,-lc -Wl,--gc-sections"
+    PROPERTY LINK_FLAGS "-T ${LINK_SCRIPT} -Wl,--gc-sections"
 )
 
 if(NOT USE_FULL_NEWLIB)

@@ -26,9 +26,6 @@ before_install:
   - export PATH=~/.cargo/bin:${PATH}
   - rustup component add rust-src
 
-  # Get xargo
-  - cargo install xargo
-
   # Pystache needed for generation of MourOS diagnostic code
   - sudo pip install pystache
 

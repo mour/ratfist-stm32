@@ -1,6 +1,5 @@
 
-sudo: required
-dist: trusty
+dist: bionic
 
 language: c
 
@@ -9,22 +8,14 @@ before_install:
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
 
-  # Get cmake v3.6
-  - CMAKE_URL="https://cmake.org/files/v3.6/cmake-3.6.2-Linux-x86_64.tar.gz"
-  - mkdir cmake && travis_retry wget --no-check-certificate --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C cmake
-  - export PATH=${DEPS_DIR}/cmake/bin:${PATH}
-  - cd ..
-
-  # Install GCC ARM
-  - sudo add-apt-repository -y ppa:team-gcc-arm-embedded/ppa
-  - sudo apt-get -qq update
-  - sudo apt-get -qq install -y --force-yes gcc-arm-embedded
   - arm-none-eabi-gcc --version
 
   # Get rust
   - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
   - export PATH=~/.cargo/bin:${PATH}
   - rustup component add rust-src
+  - rustup component add --target thumbv6m-none-eabi rust-std
+  - rustup component add --target thumbv7em-none-eabihf rust-std
 
   # Pystache needed for generation of MourOS diagnostic code
   - sudo pip install pystache
@@ -78,6 +69,8 @@ script:
 addons:
   apt:
     packages:
+      - cmake
+      - gcc-arm-none-eabi
       # 32 bit compiler used for compiling tests
       - gcc-multilib
       # Documentation tools

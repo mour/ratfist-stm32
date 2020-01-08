@@ -4,10 +4,6 @@ dist: bionic
 language: c
 
 before_install:
-  - |
-    DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
-    mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
-
   - arm-none-eabi-gcc --version
 
   # Get rust
@@ -16,6 +12,7 @@ before_install:
   - rustup component add rust-src
   - rustup component add --target thumbv6m-none-eabi rust-std
   - rustup component add --target thumbv7em-none-eabihf rust-std
+  - rustc --version
 
   # Pystache needed for generation of MourOS diagnostic code
   - sudo pip install pystache

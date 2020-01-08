@@ -65,9 +65,11 @@ script:
 
 addons:
   apt:
+    sources:
+      - sourceline: 'ppa:team-gcc-arm-embedded/ppa'
     packages:
       - cmake
-      - gcc-arm-none-eabi
+      - gcc-arm-embedded
       # 32 bit compiler used for compiling tests
       - gcc-multilib
       # Documentation tools
